@@ -1,0 +1,13 @@
+--- original/src/netanim/model/animation-interface.cc	2013-10-16 14:29:43.000000000 +0800
++++ src/netanim/model/animation-interface.cc	2013-10-17 01:17:55.000000000 +0800
+@@ -678,7 +678,9 @@
+             }
+           std::string channelType = ch->GetInstanceTypeId ().GetName ();
+           NS_LOG_DEBUG ("Got ChannelType" << channelType);
+-          if (channelType == std::string ("ns3::PointToPointChannel"))
++          if (channelType == std::string ("ns3::PointToPointChannel") ||
++              channelType == std::string ("ns3::CsmaChannel") ||
++              channelType == std::string ("ns3::SimpleChannel"))
+             { // Since these are duplex links, we only need to dump
+               // if srcid < dstid
+               uint32_t nChDev = ch->GetNDevices ();
