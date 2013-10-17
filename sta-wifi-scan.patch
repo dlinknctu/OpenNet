@@ -63,7 +63,50 @@ diff -ur original/ns-allinone-3.18/ns-3.18/src/wifi/model/mac-low.h ns-allinone-
  
    MacLow ();
    virtual ~MacLow ();
-@@ -626,6 +627,7 @@
+@@ -420,6 +421,13 @@
+    */
+   void SetRxCallback (Callback<void,Ptr<Packet>,const WifiMacHeader *> callback);
+   /**
++   * \param callback the callback which receives every incoming packet.
++   *
++   * This callback typically forwards incoming packets on scanning to
++   * an instance of ns3::MacRxMiddle.
++   */
++  void SetSnrRxCallback (Callback<void,Ptr<Packet>,const WifiMacHeader *, double> callback);
++  /**
+    * \param listener listen to NAV events for every incoming
+    *        and outgoing packet.
+    */
+@@ -512,6 +520,12 @@
+    * associated to this AC.
+    */
+   void RegisterBlockAckListenerForAc (enum AcIndex ac, MacLowBlockAckEventListener *listener);
++  /**
++   * \param enalbe if true enalbe forward snr otherwise don't
++   *
++   * Higher mac layer need sometimes snr information while forward up packet.
++   */
++  void EnableForwardSnr (bool enable);
+ private:
+   void CancelAllEvents (void);
+   uint32_t GetAckSize (void) const;
+@@ -544,6 +558,15 @@
+   Time CalculateOverallTxTime (Ptr<const Packet> packet,
+                                const WifiMacHeader* hdr,
+                                const MacLowTransmissionParameters &params) const;
++  WifiMode GetRtsTxMode (Ptr<const Packet> packet, const WifiMacHeader *hdr) const;
++  WifiMode GetDataTxMode (Ptr<const Packet> packet, const WifiMacHeader *hdr) const;
++  WifiMode GetCtsTxModeForRts (Mac48Address to, WifiMode rtsTxMode) const;
++  WifiMode GetAckTxModeForData (Mac48Address to, WifiMode dataTxMode) const;
++
++  Time GetCtsDuration (Mac48Address to, WifiMode rtsTxMode) const;
++  Time GetAckDuration (Mac48Address to, WifiMode dataTxMode) const;
++  Time GetBlockAckDuration (Mac48Address to, WifiMode blockAckReqTxMode, enum BlockAckType type) const;
++  void NotifyNav (const WifiMacHeader &hdr, WifiMode txMode, WifiPreamble preamble);
+   void NotifyNav (Ptr<const Packet> packet,const WifiMacHeader &hdr, WifiMode txMode, WifiPreamble preamble);
+   void DoNavResetNow (Time duration);
+   bool DoNavStartNow (Time duration);
+@@ -626,6 +649,7 @@
    Ptr<WifiPhy> m_phy;
    Ptr<WifiRemoteStationManager> m_stationManager;
    MacLowRxCallback m_rxCallback;
@@ -71,7 +114,7 @@ diff -ur original/ns-allinone-3.18/ns-3.18/src/wifi/model/mac-low.h ns-allinone-
    typedef std::vector<MacLowDcfListener *>::const_iterator DcfListenersCI;
    typedef std::vector<MacLowDcfListener *> DcfListeners;
    DcfListeners m_dcfListeners;
-@@ -663,6 +665,7 @@
+@@ -663,6 +687,7 @@
    Time m_lastNavDuration;
  
    bool m_promisc;
@@ -79,7 +122,7 @@ diff -ur original/ns-allinone-3.18/ns-3.18/src/wifi/model/mac-low.h ns-allinone-
  
    // Listerner needed to monitor when a channel switching occurs.
    class PhyMacLowListener * m_phyMacLowListener;
-
+   
 diff -ur original/ns-allinone-3.18/ns-3.18/src/wifi/model/mac-rx-middle.cc ns-allinone-3.18/ns-3.18/src/wifi/model/mac-rx-middle.cc
 --- original/ns-allinone-3.18/ns-3.18/src/wifi/model/mac-rx-middle.cc	2013-08-30 13:36:59.000000000 +0800
 +++ ns-allinone-3.18/ns-3.18/src/wifi/model/mac-rx-middle.cc	2013-10-16 15:01:08.000000000 +0800
