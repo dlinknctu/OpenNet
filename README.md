@@ -4,19 +4,17 @@ A Simulator for Software-Defined Wireless Local Area Network
 
 Feature
 -------
-* Support channel scan behavior on Wi-Fi station
-> sta-wifi-scan.patch
-* Show CsmaLink and SimpleLink in NetAnim
-> animation-interface.patch
+* Support channel scan behavior on Wi-Fi station (sta-wifi-scan.patch)
+* Show CsmaLink and SimpleLink in NetAnim (animation-interface.patch)
 
 Bugfix
 ------
-* Simulator crashes when access PacketMetadata of CsmaLink
-> packet-metadata.patch
+* Simulator crashes when access PacketMetadata of CsmaLink (packet-metadata.patch)
 
 Prerequisite
 ------------
 * Linux OS (with curl and python)
+* pygccxml
 
 Installation
 ------------
