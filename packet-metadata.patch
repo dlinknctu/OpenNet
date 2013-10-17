@@ -1,5 +1,6 @@
---- original/src/network/model/packet-metadata.cc	2013-10-16 14:33:48.000000000 +0800
-+++ src/network/model/packet-metadata.cc	2013-10-16 14:34:33.000000000 +0800
+diff -ur original/ns-allinone-3.18/ns-3.18/src/network/model/packet-metadata.cc src/ns-allinone-3.18/ns-3.18/network/model/packet-metadata.cc
+--- original/ns-allinone-3.18/ns-3.18/src/network/model/packet-metadata.cc	2013-10-16 14:33:48.000000000 +0800
++++ src/ns-allinone-3.18/ns-3.18/network/model/packet-metadata.cc	2013-10-16 14:34:33.000000000 +0800
 @@ -1141,7 +1141,7 @@
      {
        NS_ASSERT (false);

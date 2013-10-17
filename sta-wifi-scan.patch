@@ -1,6 +1,6 @@
-diff -ur original/src/wifi/model/mac-low.cc src/wifi/model/mac-low.cc
---- original/src/wifi/model/mac-low.cc	2013-08-30 13:36:59.000000000 +0800
-+++ src/wifi/model/mac-low.cc	2013-10-16 14:49:35.000000000 +0800
+diff -ur original/ns-allinone-3.18/ns-3.18/src/wifi/model/mac-low.cc ns-allinone-3.18/ns-3.18/src/wifi/model/mac-low.cc
+--- original/ns-allinone-3.18/ns-3.18/src/wifi/model/mac-low.cc	2013-08-30 13:36:59.000000000 +0800
++++ ns-allinone-3.18/ns-3.18src//wifi/model/mac-low.cc	2013-10-16 14:49:35.000000000 +0800
 @@ -295,7 +295,8 @@
      m_waitSifsEvent (),
      m_endTxNoAckEvent (),
@@ -52,9 +52,9 @@ diff -ur original/src/wifi/model/mac-low.cc src/wifi/model/mac-low.cc
 +
  } // namespace ns3
 
-diff -ur original/src/wifi/model/mac-low.h src/wifi/model/mac-low.h
---- original/src/wifi/model/mac-low.h	2013-08-30 13:36:59.000000000 +0800
-+++ src/wifi/model/mac-low.h	2013-10-16 14:55:29.000000000 +0800
+diff -ur original/ns-allinone-3.18/ns-3.18/src/wifi/model/mac-low.h ns-allinone-3.18/ns-3.18/src/wifi/model/mac-low.h
+--- original/ns-allinone-3.18/ns-3.18/src/wifi/model/mac-low.h	2013-08-30 13:36:59.000000000 +0800
++++ ns-allinone-3.18/ns-3.18/src/wifi/model/mac-low.h	2013-10-16 14:55:29.000000000 +0800
 @@ -381,6 +381,7 @@
  {
  public:
@@ -80,9 +80,9 @@ diff -ur original/src/wifi/model/mac-low.h src/wifi/model/mac-low.h
    // Listerner needed to monitor when a channel switching occurs.
    class PhyMacLowListener * m_phyMacLowListener;
 
-diff -ur original/src/wifi/model/mac-rx-middle.cc src/wifi/model/mac-rx-middle.cc
---- original/src/wifi/model/mac-rx-middle.cc	2013-08-30 13:36:59.000000000 +0800
-+++ src/wifi/model/mac-rx-middle.cc	2013-10-16 15:01:08.000000000 +0800
+diff -ur original/ns-allinone-3.18/ns-3.18/src/wifi/model/mac-rx-middle.cc ns-allinone-3.18/ns-3.18/src/wifi/model/mac-rx-middle.cc
+--- original/ns-allinone-3.18/ns-3.18/src/wifi/model/mac-rx-middle.cc	2013-08-30 13:36:59.000000000 +0800
++++ ns-allinone-3.18/ns-3.18/src/wifi/model/mac-rx-middle.cc	2013-10-16 15:01:08.000000000 +0800
 @@ -136,6 +136,13 @@
    m_callback = callback;
  }
@@ -146,9 +146,9 @@ diff -ur original/src/wifi/model/mac-rx-middle.cc src/wifi/model/mac-rx-middle.c
 +
  } // namespace ns3
 
-diff -ur original/src/wifi/model/mac-rx-middle.h src/wifi/model/mac-rx-middle.h
---- original/src/wifi/model/mac-rx-middle.h	2013-08-30 13:36:59.000000000 +0800
-+++ src/wifi/model/mac-rx-middle.h	2013-10-16 14:53:58.000000000 +0800
+diff -ur original/ns-allinone-3.18/ns-3.18/src/wifi/model/mac-rx-middle.h ns-allinone-3.18/ns-3.18/src/wifi/model/mac-rx-middle.h
+--- original/ns-allinone-3.18/ns-3.18/src/wifi/model/mac-rx-middle.h	2013-08-30 13:36:59.000000000 +0800
++++ ns-allinone-3.18/ns-3.18/src/wifi/model/mac-rx-middle.h	2013-10-16 14:53:58.000000000 +0800
 @@ -41,13 +41,16 @@
  {
  public:
@@ -175,9 +175,9 @@ diff -ur original/src/wifi/model/mac-rx-middle.h src/wifi/model/mac-rx-middle.h
  
  } // namespace ns3
 
-diff -ur original/src/wifi/model/sta-wifi-mac.cc src/wifi/model/sta-wifi-mac.cc
---- original/src/wifi/model/sta-wifi-mac.cc	2013-08-30 13:36:59.000000000 +0800
-+++ src/wifi/model/sta-wifi-mac.cc	2013-10-16 15:27:47.000000000 +0800
+diff -ur original/ns-allinone-3.18/ns-3.18/src/wifi/model/sta-wifi-mac.cc ns-allinone-3.18/ns-3.18/src/wifi/model/sta-wifi-mac.cc
+--- original/ns-allinone-3.18/ns-3.18/src/wifi/model/sta-wifi-mac.cc	2013-08-30 13:36:59.000000000 +0800
++++ ns-allinone-3.18/ns-3.18/src/wifi/model/sta-wifi-mac.cc	2013-10-16 15:27:47.000000000 +0800
 @@ -26,6 +26,7 @@
  #include "ns3/string.h"
  #include "ns3/pointer.h"
@@ -539,9 +539,9 @@ diff -ur original/src/wifi/model/sta-wifi-mac.cc src/wifi/model/sta-wifi-mac.cc
 +
  } // namespace ns3
 
-diff -ur original/src/wifi/model/sta-wifi-mac.h src/wifi/model/sta-wifi-mac.h
---- original/src/wifi/model/sta-wifi-mac.h	2013-08-30 13:36:59.000000000 +0800
-+++ src/wifi/model/sta-wifi-mac.h	2013-10-16 15:12:52.000000000 +0800
+diff -ur original/ns-allinone-3.18/ns-3.18/src/wifi/model/sta-wifi-mac.h ns-allinone-3.18/ns-3.18/src/wifi/model/sta-wifi-mac.h
+--- original/ns-allinone-3.18/ns-3.18/src/wifi/model/sta-wifi-mac.h	2013-08-30 13:36:59.000000000 +0800
++++ ns-allinone-3.18/ns-3.18/src/wifi/model/sta-wifi-mac.h	2013-10-16 15:12:52.000000000 +0800
 @@ -43,6 +43,21 @@
  class StaWifiMac : public RegularWifiMac
  {
