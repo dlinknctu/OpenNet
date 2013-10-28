@@ -6,7 +6,7 @@ diff -ur original/ns-allinone-3.18/ns-3.18/src/network/model/packet-metadata.cc 
        NS_ASSERT (false);
      }
 -  m_offset += extraItem.fragmentEnd - extraItem.fragmentStart;
-+  m_offset += extraItem.fragmentEnd - extraItem.fragmentStart - m_offset;
++  m_offset = extraItem.fragmentEnd - extraItem.fragmentStart;
    return item;
  }
  
