@@ -1,0 +1,8 @@
+diff -ur original/ns-3.18/src/netanim/wscript src/ns-3.18/src/netanim/wscript
+--- original/ns-3.18/src/netanim/wscript	2013-10-29 14:36:14.000000000 +0800
++++ ns-3.18/src/netanim/wscript	2013-10-29 14:36:49.000000000 +0800
+@@ -28,3 +28,4 @@
+ 	if (bld.env['ENABLE_EXAMPLES']) :
+ 		bld.recurse('examples')
+ 
++	bld.ns3_python_bindings()
