@@ -1,6 +1,6 @@
-diff -ur original/ns-allinone-3.18/ns-3.18/src/network/model/animation-interface.cc src/ns-allinone-3.18/ns-3.18/network/model/animation-interface.cc
---- original/ns-allinone-3.18/ns-3.18/src/netanim/model/animation-interface.cc	2013-10-16 14:29:43.000000000 +0800
-+++ src/ns-allinone-3.18/ns-3.18/netanim/model/animation-interface.cc	2013-10-17 01:17:55.000000000 +0800
+diff -ur original/ns-3.18/src/network/model/animation-interface.cc ns-3.18/src/network/model/animation-interface.cc
+--- original/ns-3.18/src/netanim/model/animation-interface.cc	2013-10-16 14:29:43.000000000 +0800
++++ ns-3.18/src/netanim/model/animation-interface.cc	2013-10-17 01:17:55.000000000 +0800
 @@ -678,7 +678,9 @@
              }
            std::string channelType = ch->GetInstanceTypeId ().GetName ();
