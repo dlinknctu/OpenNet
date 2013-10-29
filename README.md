@@ -27,12 +27,12 @@ c. Rebuild Mininet <br/>
 2. Patch and rebuild ns-3 <br/>
 a. Copy patches to the ns-3 root folder
 <pre>cp ns3-patch/*.patch ns-allinone-3.18</pre>
-b. Apply patches <br/>
+b. Apply patches
 <pre>cd ns-allinone-3.18
-patch -p1 < sta-wifi-scan.patch
-patch -p1 < animation-interface.patch
-patch -p1 < packet-metadata.patch
-patch -p1 < netanim-python.patch</pre>
+patch -p1 &lt; sta-wifi-scan.patch
+patch -p1 &lt; animation-interface.patch
+patch -p1 &lt; packet-metadata.patch
+patch -p1 &lt; netanim-python.patch</pre>
 c. Scan python API
 <pre>./waf --apiscan=netanim</pre>
 d. Rebuild ns-3
