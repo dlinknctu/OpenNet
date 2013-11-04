@@ -6,7 +6,7 @@ Feature
 -------
 * Complement ns-3 by supporting channel scan behavior on Wi-Fi station (sta-wifi-scan.patch)
 * Show CsmaLink and SimpleLink in NetAnim (animation-interface.patch)
-* Fix runtime error when access PacketMetadata of CsmaLink (packet-metadata.patch)
+* Fix runtime error when access PacketMetadata of CsmaLink (tap-bridge-offset.patch) [Submitted]("https://www.nsnam.org/bugzilla/show_bug.cgi?id=1787", "ns-3 bugzilla issue 1787")
 
 Prerequisite
 ------------
