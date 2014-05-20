@@ -31,7 +31,7 @@ b. Apply patches
 <pre>cd ns-allinone-3.18
 patch -p1 &lt; sta-wifi-scan.patch
 patch -p1 &lt; animation-interface.patch
-patch -p1 &lt; packet-metadata.patch
+patch -p1 &lt; tap-bridge-offset.patch
 patch -p1 &lt; netanim-python.patch</pre>
 c. Scan python API
 <pre>./waf --apiscan=netanim</pre>
