@@ -1,6 +1,7 @@
 OpenNet
 =======
 A simulator built on top of Mininet and ns-3 for Software-Defined Wireless Local Area Network (SDWLAN)
+http://www.slideshare.net/rascov/20140824-open-net
 
 Feature
 -------
