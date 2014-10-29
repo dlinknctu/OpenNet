@@ -1,6 +1,7 @@
 OpenNet
 =======
 A simulator built on top of Mininet and ns-3 for Software-Defined Wireless Local Area Network (SDWLAN)
+http://www.slideshare.net/rascov/20140824-open-net
 
 Feature
 -------
@@ -31,7 +32,7 @@ b. Apply patches
 <pre>cd ns-allinone-3.18
 patch -p1 &lt; sta-wifi-scan.patch
 patch -p1 &lt; animation-interface.patch
-patch -p1 &lt; packet-metadata.patch
+patch -p1 &lt; tap-bridge-offset.patch
 patch -p1 &lt; netanim-python.patch</pre>
 c. Scan python API
 <pre>./waf --apiscan=netanim</pre>
