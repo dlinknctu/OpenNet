@@ -26,8 +26,8 @@ import ns.wimax
 import ns.uan
 import ns.netanim
 
-nodes = [ { 'name': 'h1', 'type': 'host', 'position': (0.0, 10.0, 0.0), 'velocity': (2.5, 0, 0) }, 
-          { 'name': 'h2', 'type': 'host', 'mobility': setListPositionAllocate(
+nodes = [ { 'name': 'h1', 'type': 'host', 'ip': '10.10.10.1', 'position': (0.0, 10.0, 0.0), 'velocity': (2.5, 0, 0) },
+          { 'name': 'h2', 'type': 'host', 'ip': '10.10.10.2', 'mobility': setListPositionAllocate(
 createMobilityHelper("ns3::RandomWalk2dMobilityModel",n0="Bounds",v0=ns.mobility.RectangleValue(ns.mobility.Rectangle(100,200,-50,50))), createListPositionAllocate(x1=150,y1=30,z1=0)) }, 
           { 'name': 's1', 'type': 'switch', 'position': (0.0, 0.0, 0.0) }, 
           { 'name': 's2', 'type': 'switch', 'position': (120.0, 0.0, 0.0) },
@@ -38,8 +38,8 @@ createMobilityHelper("ns3::RandomWalk2dMobilityModel",n0="Bounds",v0=ns.mobility
           { 'name': 's7', 'type': 'switch', 'position': (-60.0, -60.0*(3**0.5), 0.0) },
         ]
 
-wifiintfs = [ {'nodename': 'h1', 'type': 'sta', 'channel': 1, 'ssid': 'ssid', 'ip': "10.0.0.1"}, 
-              {'nodename': 'h2', 'type': 'sta', 'channel': 11, 'ssid': 'ssid', 'ip': "10.0.0.2"},
+wifiintfs = [ {'nodename': 'h1', 'type': 'sta', 'channel': 1, 'ssid': 'ssid'},
+              {'nodename': 'h2', 'type': 'sta', 'channel': 11, 'ssid': 'ssid'},
               {'nodename': 's1', 'type': 'ap', 'channel': 1, 'ssid': 'ssid'}, 
               {'nodename': 's2', 'type': 'ap', 'channel': 6, 'ssid': 'ssid'},
               {'nodename': 's3', 'type': 'ap', 'channel': 11, 'ssid': 'ssid'},
@@ -81,6 +81,7 @@ def WifiNet():
         nodemob = n.get('mobility', None)
         nodepos = n.get('position', None)
         nodevel = n.get('velocity', None)
+        nodeip = n.get('ip', None)
         if nodetype is 'host':
             addfunc = net.addHost
             color = (255, 0, 0)
@@ -91,7 +92,7 @@ def WifiNet():
             addfunc = None
         if nodename is None or addfunc is None: 
             continue
-        node = addfunc (nodename)
+        node = addfunc (nodename, ip=nodeip)
         mininet.ns3.setMobilityModel (node, nodemob)
         if nodepos is not None:
             mininet.ns3.setPosition (node, nodepos[0], nodepos[1], nodepos[2])
@@ -117,8 +118,6 @@ def WifiNet():
             continue
         node = getWifiNode (wifinodes, winodename)
         tb = addfunc (node, wichannel, wissid)
-        if wiip is not None:
-            tb.setIP (wiip)
     
     for cl in csmalinks:
         clnodename1 = cl.get('nodename1', None)  
@@ -143,8 +142,8 @@ def WifiNet():
     mininet.ns3.start()                    
     
     info( 'Testing network connectivity\n' )
-    wifinodes[0].cmdPrint('ping 10.0.0.2 -c 100')
-
+    wifinodes[0].cmdPrint('ping 10.10.10.2 -c 3')
+    
     info( '*** Stopping network' )
     mininet.ns3.clear()                    
     net.stop()
