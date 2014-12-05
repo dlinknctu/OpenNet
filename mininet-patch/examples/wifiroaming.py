@@ -5,6 +5,7 @@ This example shows how to create an empty Mininet object
 (without a topology object) and add nodes to it manually.
 """
 import sys
+import os
 
 import mininet.net
 import mininet.node
@@ -13,7 +14,7 @@ import mininet.log
 import mininet.ns3
 
 from mininet.net import Mininet, MininetWithControlNet
-from mininet.node import OVSController
+from mininet.node import Controller, RemoteController
 from mininet.cli import CLI
 from mininet.log import setLogLevel, info                     
 from mininet.ns3 import *        
@@ -70,10 +71,16 @@ def WifiNet():
     net = Mininet()
 
     info( '*** Adding controller\n' )
-    net.addController( 'c0' )
+    net.addController( 'c0', controller=RemoteController, ip='127.0.0.1', port=6633 )
 
     wifi = WifiSegment(standard = ns.wifi.WIFI_PHY_STANDARD_80211g)
     wifinodes = []
+
+    rv = os.path.isdir("/tmp/xml")
+    if rv is False:
+        os.mkdir("/tmp/xml")
+    anim = ns.netanim.AnimationInterface("/tmp/xml/wifi-wired-bridged4.xml")
+    anim.EnablePacketMetadata (True)
 
     for n in nodes:
         nodename = n.get('name', None)
@@ -95,12 +102,13 @@ def WifiNet():
         node = addfunc (nodename, ip=nodeip)
         mininet.ns3.setMobilityModel (node, nodemob)
         if nodepos is not None:
+            anim.UpdatePosition (node.nsNode, nodepos[0], nodepos[1], nodepos[2]);
             mininet.ns3.setPosition (node, nodepos[0], nodepos[1], nodepos[2])
         if nodevel is not None:
             mininet.ns3.setVelocity (node, nodevel[0], nodevel[1], nodevel[2])
         wifinodes.append (node)
-        ns.netanim.AnimationInterface.SetNodeDescription (node.nsNode, nodename+'-'+str(node.nsNode.GetId()))
-        ns.netanim.AnimationInterface.SetNodeColor (node.nsNode, color[0], color[1], color[2])
+        anim.UpdateNodeDescription (node.nsNode, nodename+'-'+str(node.nsNode.GetId()))
+        anim.UpdateNodeColor (node.nsNode, color[0], color[1], color[2])
 
     for wi in wifiintfs:
         winodename = wi.get('nodename', None)
@@ -130,24 +138,28 @@ def WifiNet():
             continue
         CSMALink( clnode1, clnode2, DataRate="100Mbps")
 
-
+    rv = os.path.isdir("/tmp/pcap")
+    if rv is False:
+        os.mkdir("/tmp/pcap")
     ns.wifi.YansWifiPhyHelper().Default().EnablePcapAll("/tmp/pcap/wifi")
     ns.csma.CsmaHelper().EnablePcapAll("/tmp/pcap/csma")
 
-    anim = ns.netanim.AnimationInterface("/tmp/xml/wifi-wired-bridged4.xml")
-    anim.EnablePacketMetadata (True)
-
-    info( '*** Starting network\n')
+    info( '*** Starting network\n' )
     net.start()
     mininet.ns3.start()                    
     
     info( 'Testing network connectivity\n' )
-    wifinodes[0].cmdPrint('ping 10.10.10.2 -c 3')
-    
-    info( '*** Stopping network' )
-    mininet.ns3.clear()                    
+    wifinodes[0].cmdPrint( 'ping 10.10.10.2 -c 3' )
+
+    CLI( net )
+
+    info( '*** Stopping network\n' )
+    mininet.ns3.clear()
+    info( '*** mininet.ns3.clear()\n' )
     net.stop()
+    info( '*** net.stop()\n' )
 
 if __name__ == '__main__':
     setLogLevel( 'info' )
     WifiNet()
+    sys.exit(0)
