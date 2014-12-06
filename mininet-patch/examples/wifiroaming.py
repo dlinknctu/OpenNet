@@ -28,8 +28,10 @@ import ns.uan
 import ns.netanim
 
 nodes = [ { 'name': 'h1', 'type': 'host', 'ip': '10.10.10.1', 'position': (0.0, 10.0, 0.0), 'velocity': (2.5, 0, 0) },
-          { 'name': 'h2', 'type': 'host', 'ip': '10.10.10.2', 'mobility': setListPositionAllocate(
-createMobilityHelper("ns3::RandomWalk2dMobilityModel",n0="Bounds",v0=ns.mobility.RectangleValue(ns.mobility.Rectangle(100,200,-50,50))), createListPositionAllocate(x1=150,y1=30,z1=0)) }, 
+           { 'name': 'h2', 'type': 'host', 'ip': '10.10.10.2', 'mobility': setListPositionAllocate(
+             createMobilityHelper("ns3::RandomWalk2dMobilityModel",n0="Bounds",
+             v0=ns.mobility.RectangleValue(ns.mobility.Rectangle(100,200,-50,50))),
+             createListPositionAllocate(x1=150,y1=30,z1=0)) }, 
           { 'name': 's1', 'type': 'switch', 'position': (0.0, 0.0, 0.0) }, 
           { 'name': 's2', 'type': 'switch', 'position': (120.0, 0.0, 0.0) },
           { 'name': 's3', 'type': 'switch', 'position': (60.0, 60.0*(3**0.5), 0.0) },
@@ -76,12 +78,18 @@ def WifiNet():
     wifi = WifiSegment(standard = ns.wifi.WIFI_PHY_STANDARD_80211g)
     wifinodes = []
 
+    rv = os.path.isdir("/tmp/pcap")
+    if rv is False:
+        os.mkdir("/tmp/pcap")
+    ns.wifi.YansWifiPhyHelper().Default().EnablePcapAll("/tmp/pcap/wifi")
+    ns.csma.CsmaHelper().EnablePcapAll("/tmp/pcap/csma")
+
     rv = os.path.isdir("/tmp/xml")
     if rv is False:
-        os.mkdir("/tmp/xml")
+        os.mkdir("/tmp/xml")    
     anim = ns.netanim.AnimationInterface("/tmp/xml/wifi-wired-bridged4.xml")
     anim.EnablePacketMetadata (True)
-
+    
     for n in nodes:
         nodename = n.get('name', None)
         nodetype = n.get('type', None)
@@ -102,7 +110,6 @@ def WifiNet():
         node = addfunc (nodename, ip=nodeip)
         mininet.ns3.setMobilityModel (node, nodemob)
         if nodepos is not None:
-            anim.UpdatePosition (node.nsNode, nodepos[0], nodepos[1], nodepos[2]);
             mininet.ns3.setPosition (node, nodepos[0], nodepos[1], nodepos[2])
         if nodevel is not None:
             mininet.ns3.setVelocity (node, nodevel[0], nodevel[1], nodevel[2])
@@ -138,12 +145,6 @@ def WifiNet():
             continue
         CSMALink( clnode1, clnode2, DataRate="100Mbps")
 
-    rv = os.path.isdir("/tmp/pcap")
-    if rv is False:
-        os.mkdir("/tmp/pcap")
-    ns.wifi.YansWifiPhyHelper().Default().EnablePcapAll("/tmp/pcap/wifi")
-    ns.csma.CsmaHelper().EnablePcapAll("/tmp/pcap/csma")
-
     info( '*** Starting network\n' )
     net.start()
     mininet.ns3.start()                    
@@ -154,12 +155,14 @@ def WifiNet():
     CLI( net )
 
     info( '*** Stopping network\n' )
+    mininet.ns3.stop()
+    info( '*** mininet.ns3.stop()\n' )
     mininet.ns3.clear()
     info( '*** mininet.ns3.clear()\n' )
     net.stop()
-    info( '*** net.stop()\n' )
+    info( '*** net.stop()\n' )      
 
 if __name__ == '__main__':
     setLogLevel( 'info' )
     WifiNet()
-    sys.exit(0)
+    #sys.exit(0)
