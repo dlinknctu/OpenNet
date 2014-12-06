@@ -1,29 +1,17 @@
 diff -rpuN ns-3.21-backup/src/netanim/model/animation-interface.cc ns-3.21/src/netanim/model/animation-interface.cc
 --- ns-3.21-backup/src/netanim/model/animation-interface.cc	2014-12-02 20:51:57.485842717 +0800
-+++ ns-3.21/src/netanim/model/animation-interface.cc	2014-12-03 07:22:21.161856762 +0800
-@@ -1510,11 +1510,20 @@ AnimationInterface::UpdatePosition (Ptr
- }
- 
- Vector 
-+AnimationInterface::UpdatePosition (Ptr <Node> n, double x, double y, double z)
-+{
-+  Vector v = Vector (x, y, z);
-+  UpdatePosition(n, v);
-+  return v;  
-+}
-+
-+Vector 
- AnimationInterface::GetPosition (Ptr <Node> n)
++++ ns-3.21/src/netanim/model/animation-interface.cc	2014-12-06 23:07:01.542555957 +0800
+@@ -1514,7 +1514,8 @@ AnimationInterface::GetPosition (Ptr <No
  {
    if (m_nodeLocation.find (n->GetId ()) == m_nodeLocation.end ())
      {
 -      NS_FATAL_ERROR ("Node:" <<n->GetId () << " not found in Location table");
 +      //NS_FATAL_ERROR ("Node:" <<n->GetId () << " not found in Location table");
-+      return Vector( 0, 0, 0 );
++      m_nodeLocation[n->GetId ()] = Vector (0, 0, 0);
      }  
    return m_nodeLocation[n->GetId ()];
  }
-@@ -1579,7 +1588,10 @@ AnimationInterface::WriteLinkProperties
+@@ -1579,7 +1580,10 @@ AnimationInterface::WriteLinkProperties
              }
            std::string channelType = ch->GetInstanceTypeId ().GetName ();
            NS_LOG_DEBUG ("Got ChannelType" << channelType);
@@ -35,23 +23,3 @@ diff -rpuN ns-3.21-backup/src/netanim/model/animation-interface.cc ns-3.21/src/n
              { // Since these are duplex links, we only need to dump
                // if srcid < dstid
                uint32_t nChDev = ch->GetNDevices ();
-diff -rpuN ns-3.21-backup/src/netanim/model/animation-interface.h ns-3.21/src/netanim/model/animation-interface.h
---- ns-3.21-backup/src/netanim/model/animation-interface.h	2014-12-02 20:51:57.485842717 +0800
-+++ ns-3.21/src/netanim/model/animation-interface.h	2014-12-03 07:04:50.247625379 +0800
-@@ -418,6 +418,8 @@ public:
-    */
-   double GetNodeEnergyFraction (Ptr <const Node> node) const;
- 
-+  Vector UpdatePosition (Ptr <Node> n, double x, double y, double z);
-+
- private:
- 
- 
-@@ -758,7 +760,6 @@ private:
-   std::vector < Ptr <Node> > GetMovedNodes ();
-   void MobilityCourseChangeTrace (Ptr <const MobilityModel> mob);
- 
--
-   // ##### XML Helpers ##### 
- 
-   void WriteNonP2pLinkProperties (uint32_t id, std::string ipv4Address, std::string channelType);
