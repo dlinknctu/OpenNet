@@ -46,7 +46,6 @@ $ ln /usr/local/bin/gccxml /bin/gccxml
 <pre>
 In the /usr/lib/python2.7/site-packages/pygccxml/parser/config.py,
 115                   , gccxml\_path='/usr/local/bin'
-
 In the ns-allinone-3.21/ns-3.21/bindings/python/ns3modulescan-modular.py,
 236         cflags=('--gccxml-cxxflags "%s -DPYTHON\_SCAN"' % cflags)
 </pre>
@@ -103,7 +102,6 @@ d. Rebuild ns-3
 
 Run OpenNet
 -----------
->
 <pre>
 Launch a controller at localhost:6633
 $ cd ns-allinone-3.21/ns-3.21
