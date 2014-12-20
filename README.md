@@ -74,10 +74,10 @@ e. Rebuild Mininet
 
 2. Install, patch and rebuild ns-3 <br/>
 a. Copy patches to the ns-3 root folder
-<pre>
+`<pre>
 $ cd ns-allinone-3.21/ns-3.21
-$ cp ns3-patch/`*`.patch .
-</pre>
+$ cp ns3-patch/*.patch .
+</pre>`
 b. Apply patches
 <pre>
 $ patch -p1 &lt; animation-interface.patch
