@@ -76,7 +76,7 @@ e. Rebuild Mininet
 a. Copy patches to the ns-3 root folder
 <pre>
 $ cd ns-allinone-3.21/ns-3.21
-$ cp ns3-patch/\*.patch .
+$ cp ns3-patch/`*`.patch .
 </pre>
 b. Apply patches
 <pre>
