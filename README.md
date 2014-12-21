@@ -42,7 +42,7 @@ $ make
 $ sudo make install
 $ ln /usr/local/bin/gccxml /bin/gccxml
 </pre>
-6. Setup gccxml <br/>
+6. Modify pygccxml parser configuration <br/>
 <pre>
 In the /usr/lib/python2.7/site-packages/pygccxml/parser/config.py,
 at line 115, change gccxml\_path='' into gccxml\_path='/usr/local/bin'
