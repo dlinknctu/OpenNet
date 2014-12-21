@@ -11,7 +11,7 @@ Feature
 
 Prerequisite
 ------------
-* Fedora 20 3.17.3-200
+* Fedora 21 3.17.6-300.fc21.x86\_64
 1. Fetch [Mininet](https://github.com/mininet/mininet "Mininet") <br/>
 <pre>$ git clone https://github.com/mininet/mininet.git</pre>
 2. Fetch [ns-3.21](http://www.nsnam.org/ns-3-21 "ns-3.21") <br/>
@@ -37,7 +37,7 @@ $ git clone https://github.com/gccxml/gccxml.git
 $ cd gccxml
 $ mkdir gccxml-build
 $ cd gccxml-build
-$ cmake ../gccxml
+$ cmake ../
 $ make
 $ sudo make install
 $ ln /usr/local/bin/gccxml /bin/gccxml
@@ -45,9 +45,7 @@ $ ln /usr/local/bin/gccxml /bin/gccxml
 6. Setup gccxml <br/>
 <pre>
 In the /usr/lib/python2.7/site-packages/pygccxml/parser/config.py,
-115                   , gccxml\_path='/usr/local/bin'
-In the ns-allinone-3.21/ns-3.21/bindings/python/ns3modulescan-modular.py,
-236         cflags=('--gccxml-cxxflags "%s -DPYTHON\_SCAN"' % cflags)
+at line 115, change gccxml\_path='' into gccxml\_path='/usr/local/bin'
 </pre>
 
 Install OpenNet
@@ -73,7 +71,7 @@ e. Rebuild Mininet
 <pre>$ sudo util/install.sh -n</pre>
 
 2. Install, patch and rebuild ns-3 <br/>
-a. Copy patches to the ns-3 root folder
+a. Copy patches to the ns-3.21 folder
 <pre>
 $ cd ns-allinone-3.21/ns-3.21
 `$ cp ns3-patch/*.patch .`
