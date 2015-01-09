@@ -16,7 +16,7 @@ Prerequisite
 <pre>$ git clone https://github.com/mininet/mininet.git</pre>
 2. Fetch [ns-3.21](http://www.nsnam.org/ns-3-21 "ns-3.21") <br/>
 <pre>
-$ curl -O https://www.nsnam.org/release/ns-allinone-3.21.tar.bz2
+$ curl -O -k https://www.nsnam.org/release/ns-allinone-3.21.tar.bz2
 $ tar xf ns-allinone-3.21.tar.bz2
 </pre>
 3. Install packages for ns-3.21 <br/>
