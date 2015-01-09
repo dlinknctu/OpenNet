@@ -85,10 +85,9 @@ $ patch -p1 &lt; sta-wifi-scan.patch
 c. Configure ns-3
 <pre>
 $ ./waf configure
-</pre>
-Make sure<br/>
-* Python Bindings               : enabled<br/>
-* Python API Scanning Support   : enabled<br/>
+Make sure
+Python Bindings               : enabled
+Python API Scanning Support   : enabled
 </pre>
 c. Scan python API
 <pre>
