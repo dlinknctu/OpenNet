@@ -22,7 +22,7 @@ $ tar xf ns-allinone-3.21.tar.bz2
 3. Install packages for ns-3.21 <br/>
 <pre>
 $ sudo yum install gcc gcc-c++ python python-devel
-$ sudo yum install cmake glibc-devel.i686 glibc-devel.x86\_64
+$ sudo yum install make cmake glibc-devel.i686 glibc-devel.x86\_64
 </pre>
 4. Fetch and install [pygccxml](http://sourceforge.net/projects/pygccxml/files/pygccxml/pygccxml-1.0/pygccxml-1.0.0.zip/download "pygccxml-1.0.0") <br/>
 <pre>
