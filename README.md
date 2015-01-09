@@ -62,11 +62,11 @@ $ sudo setenforce 0
 $ sudo systemctl start openvswitch.service
 </pre>
 b. Add ns3.py into mininet/mininet
-<pre>$ cp mininet-patch/mininet/ns3.py mininet/mininet</pre>
+<pre>$ cp OpenNet/mininet-patch/mininet/ns3.py mininet/mininet</pre>
 c. Replace mininet/node.py with the one in mininet-patch
-<pre>$ cp mininet-patch/mininet/node.py mininet/mininet</pre>
+<pre>$ cp OpenNet/mininet-patch/mininet/node.py mininet/mininet</pre>
 d. Add WiFi roaming simulation script to example
-<pre>$ cp mininet-patch/examples/wifiroaming.py mininet/examples</pre>
+<pre>$ cp OpenNet/mininet-patch/examples/wifiroaming.py mininet/examples</pre>
 e. Rebuild Mininet
 <pre>$ sudo util/install.sh -n</pre>
 
@@ -74,7 +74,7 @@ e. Rebuild Mininet
 a. Copy patches to the ns-3.21 folder
 <pre>
 $ cd ns-allinone-3.21/ns-3.21
-`$ cp ns3-patch/*.patch .`
+`$ cp OpenNet/ns3-patch/*.patch .`
 </pre>
 b. Apply patches
 <pre>
@@ -85,10 +85,10 @@ $ patch -p1 &lt; sta-wifi-scan.patch
 c. Configure ns-3
 <pre>
 $ ./waf configure
-
-Make sure
-Python Bindings               : enabled
-Python API Scanning Support   : enabled
+</pre>
+Make sure<br/>
+* Python Bindings               : enabled<br/>
+* Python API Scanning Support   : enabled<br/>
 </pre>
 c. Scan python API
 <pre>
