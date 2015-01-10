@@ -58,7 +58,9 @@ $ git checkout tags/2.2.0b3
 $ sudo util/install.sh -fnpv
 $ sudo sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
 $ sudo systemctl stop firewalld.service
+$ sudo systemctl disable firewalld.service
 $ sudo setenforce 0
+$ sudo systemctl enable openvwitch.service
 $ sudo systemctl start openvswitch.service
 </pre>
 b. Add ns3.py into mininet/mininet
