@@ -78,12 +78,6 @@ def WifiNet():
     wifi = WifiSegment(standard = ns.wifi.WIFI_PHY_STANDARD_80211g)
     wifinodes = []
 
-    rv = os.path.isdir("/tmp/pcap")
-    if rv is False:
-        os.mkdir("/tmp/pcap")
-    ns.wifi.YansWifiPhyHelper().Default().EnablePcapAll("/tmp/pcap/wifi")
-    ns.csma.CsmaHelper().EnablePcapAll("/tmp/pcap/csma")
-
     rv = os.path.isdir("/tmp/xml")
     if rv is False:
         os.mkdir("/tmp/xml")    
@@ -144,6 +138,12 @@ def WifiNet():
         if clnode1 is None or clnode2 is None:
             continue
         CSMALink( clnode1, clnode2, DataRate="100Mbps")
+
+    rv = os.path.isdir("/tmp/pcap")
+    if rv is False:
+        os.mkdir("/tmp/pcap")
+    ns.wifi.YansWifiPhyHelper().Default().EnablePcapAll("/tmp/pcap/wifi")
+    ns.csma.CsmaHelper().EnablePcapAll("/tmp/pcap/csma")
 
     info( '*** Starting network\n' )
     net.start()
