@@ -1,17 +1,15 @@
-diff -ur original/ns-3.18/src/wifi/model/mac-low.cc ns-3.18/src/wifi/model/mac-low.cc
---- original/ns-3.18/src/wifi/model/mac-low.cc	2013-08-30 13:36:59.000000000 +0800
-+++ ns-3.18/src/wifi/model/mac-low.cc	2013-10-16 14:49:35.000000000 +0800
-@@ -295,7 +295,8 @@
-     m_waitSifsEvent (),
+diff -rpuN ns-3.21-backup/src/wifi/model/mac-low.cc ns-3.21/src/wifi/model/mac-low.cc
+--- ns-3.21-backup/src/wifi/model/mac-low.cc	2014-12-02 20:51:56.816845932 +0800
++++ ns-3.21/src/wifi/model/mac-low.cc	2014-12-02 21:21:25.205993317 +0800
+@@ -306,6 +306,7 @@ MacLow::MacLow ()
      m_endTxNoAckEvent (),
      m_currentPacket (0),
--    m_listener (0)
-+    m_listener (0),
-+    m_enableSnr (false)
+     m_listener (0),
++    m_enableSnr (false),
+     m_phyMacLowListener (0),
+     m_ctsToSelfSupported (false)
  {
-   NS_LOG_FUNCTION (this);
-   m_lastNavDuration = Seconds (0);
-@@ -546,6 +547,11 @@
+@@ -566,6 +567,11 @@ MacLow::SetRxCallback (Callback<void,Ptr
    m_rxCallback = callback;
  }
  void
@@ -23,24 +21,26 @@ diff -ur original/ns-3.18/src/wifi/model/mac-low.cc ns-3.18/src/wifi/model/mac-l
  MacLow::RegisterDcfListener (MacLowDcfListener *listener)
  {
    m_dcfListeners.push_back (listener);
-@@ -893,7 +899,15 @@
+@@ -929,8 +935,16 @@ MacLow::ReceiveOk (Ptr<Packet> packet, d
  rxPacket:
    WifiMacTrailer fcs;
    packet->RemoveTrailer (fcs);
 -  m_rxCallback (packet, &hdr);
-+  if (m_enableSnr)
-+    {
-+      NS_LOG_DEBUG ("enable snr receive " << m_enableSnr << rxSnr);
-+      m_rxSnrCallback (packet, &hdr, rxSnr);
-+    }
-+  else
-+    {
-+      m_rxCallback (packet, &hdr);
-+    }
-   return;
+-  return;
++   if (m_enableSnr)
++     {
++       NS_LOG_DEBUG ("enable snr receive " << m_enableSnr << rxSnr);
++       m_rxSnrCallback (packet, &hdr, rxSnr);
++     }
++   else
++     {
++       m_rxCallback (packet, &hdr);
++     }  
++   return;
  }
  
-@@ -2057,4 +2071,10 @@
+ uint32_t
+@@ -2099,4 +2113,10 @@ MacLow::RegisterBlockAckListenerForAc (e
    m_edcaListeners.insert (std::make_pair (ac, listener));
  }
  
@@ -51,19 +51,18 @@ diff -ur original/ns-3.18/src/wifi/model/mac-low.cc ns-3.18/src/wifi/model/mac-l
 +}
 +
  } // namespace ns3
-
-diff -ur original/ns-3.18/src/wifi/model/mac-low.h ns-3.18/src/wifi/model/mac-low.h
---- original/ns-3.18/src/wifi/model/mac-low.h	2013-08-30 13:36:59.000000000 +0800
-+++ ns-3.18/src/wifi/model/mac-low.h	2013-10-16 14:55:29.000000000 +0800
-@@ -381,6 +381,7 @@
- {
- public:
+diff -rpuN ns-3.21-backup/src/wifi/model/mac-low.h ns-3.21/src/wifi/model/mac-low.h
+--- ns-3.21-backup/src/wifi/model/mac-low.h	2014-12-02 20:51:56.819845918 +0800
++++ ns-3.21/src/wifi/model/mac-low.h	2014-12-02 21:21:25.214993277 +0800
+@@ -415,6 +415,7 @@ public:
+    * typedef for a callback for MacLowRx
+    */
    typedef Callback<void, Ptr<Packet>, const WifiMacHeader*> MacLowRxCallback;
 +  typedef Callback<void, Ptr<Packet>, const WifiMacHeader*, double> MacLowSnrRxCallback;
  
    MacLow ();
    virtual ~MacLow ();
-@@ -420,6 +421,13 @@
+@@ -584,6 +585,13 @@ public:
     */
    void SetRxCallback (Callback<void,Ptr<Packet>,const WifiMacHeader *> callback);
    /**
@@ -72,12 +71,12 @@ diff -ur original/ns-3.18/src/wifi/model/mac-low.h ns-3.18/src/wifi/model/mac-lo
 +   * This callback typically forwards incoming packets on scanning to
 +   * an instance of ns3::MacRxMiddle.
 +   */
-+  void SetSnrRxCallback (Callback<void,Ptr<Packet>,const WifiMacHeader *, double> callback);
-+  /**
++   void SetSnrRxCallback (Callback<void,Ptr<Packet>,const WifiMacHeader *, double> callback);
++ /**
     * \param listener listen to NAV events for every incoming
     *        and outgoing packet.
     */
-@@ -512,6 +520,12 @@
+@@ -683,6 +691,12 @@ public:
     * associated to this AC.
     */
    void RegisterBlockAckListenerForAc (enum AcIndex ac, MacLowBlockAckEventListener *listener);
@@ -87,46 +86,47 @@ diff -ur original/ns-3.18/src/wifi/model/mac-low.h ns-3.18/src/wifi/model/mac-lo
 +   * Higher mac layer need sometimes snr information while forward up packet.
 +   */
 +  void EnableForwardSnr (bool enable);
- private:
-   void CancelAllEvents (void);
-   uint32_t GetAckSize (void) const;
-@@ -544,6 +558,15 @@
+ protected:
+   /**
+    * Return a TXVECTOR for the DATA frame given the destination.
+@@ -867,7 +881,16 @@ private:
    Time CalculateOverallTxTime (Ptr<const Packet> packet,
                                 const WifiMacHeader* hdr,
                                 const MacLowTransmissionParameters &params) const;
-+  WifiMode GetRtsTxMode (Ptr<const Packet> packet, const WifiMacHeader *hdr) const;
-+  WifiMode GetDataTxMode (Ptr<const Packet> packet, const WifiMacHeader *hdr) const;
-+  WifiMode GetCtsTxModeForRts (Mac48Address to, WifiMode rtsTxMode) const;
-+  WifiMode GetAckTxModeForData (Mac48Address to, WifiMode dataTxMode) const;
+-  void NotifyNav (Ptr<const Packet> packet,const WifiMacHeader &hdr, WifiMode txMode, WifiPreamble preamble);
++WifiMode GetRtsTxMode (Ptr<const Packet> packet, const WifiMacHeader *hdr) const;
++WifiMode GetDataTxMode (Ptr<const Packet> packet, const WifiMacHeader *hdr) const;
++WifiMode GetCtsTxModeForRts (Mac48Address to, WifiMode rtsTxMode) const;
++WifiMode GetAckTxModeForData (Mac48Address to, WifiMode dataTxMode) const;
 +
-+  Time GetCtsDuration (Mac48Address to, WifiMode rtsTxMode) const;
-+  Time GetAckDuration (Mac48Address to, WifiMode dataTxMode) const;
-+  Time GetBlockAckDuration (Mac48Address to, WifiMode blockAckReqTxMode, enum BlockAckType type) const;
-+  void NotifyNav (const WifiMacHeader &hdr, WifiMode txMode, WifiPreamble preamble);
-   void NotifyNav (Ptr<const Packet> packet,const WifiMacHeader &hdr, WifiMode txMode, WifiPreamble preamble);
-   void DoNavResetNow (Time duration);
-   bool DoNavStartNow (Time duration);
-@@ -626,6 +649,7 @@
-   Ptr<WifiPhy> m_phy;
-   Ptr<WifiRemoteStationManager> m_stationManager;
-   MacLowRxCallback m_rxCallback;
++Time GetCtsDuration (Mac48Address to, WifiMode rtsTxMode) const;
++Time GetAckDuration (Mac48Address to, WifiMode dataTxMode) const;
++Time GetBlockAckDuration (Mac48Address to, WifiMode blockAckReqTxMode, enum BlockAckType type) const;
++void NotifyNav (const WifiMacHeader &hdr, WifiMode txMode, WifiPreamble preamble);  
++void NotifyNav (Ptr<const Packet> packet,const WifiMacHeader &hdr, WifiMode txMode, WifiPreamble preamble);
+   /**
+    * Reset NAV with the given duration.
+    *
+@@ -1076,6 +1099,7 @@ private:
+   Ptr<WifiPhy> m_phy; //!< Pointer to WifiPhy (actually send/receives frames)
+   Ptr<WifiRemoteStationManager> m_stationManager; //!< Pointer to WifiRemoteStationManager (rate control)
+   MacLowRxCallback m_rxCallback; //!< Callback to pass packet up
 +  MacLowSnrRxCallback m_rxSnrCallback;
-   typedef std::vector<MacLowDcfListener *>::const_iterator DcfListenersCI;
-   typedef std::vector<MacLowDcfListener *> DcfListeners;
-   DcfListeners m_dcfListeners;
-@@ -663,6 +687,7 @@
-   Time m_lastNavDuration;
+   /**
+    * typedef for an iterator for a list of MacLowDcfListener.
+    */
+@@ -1119,6 +1143,7 @@ private:
+   Time m_lastNavDuration;  //!< The duration of the latest NAV
  
-   bool m_promisc;
+   bool m_promisc;  //!< Flag if the device is operating in promiscuous mode
 +  bool m_enableSnr;
  
-   // Listerner needed to monitor when a channel switching occurs.
-   class PhyMacLowListener * m_phyMacLowListener;
-   
-diff -ur original/ns-3.18/src/wifi/model/mac-rx-middle.cc ns-3.18/src/wifi/model/mac-rx-middle.cc
---- original/ns-3.18/src/wifi/model/mac-rx-middle.cc	2013-08-30 13:36:59.000000000 +0800
-+++ ns-3.18/src/wifi/model/mac-rx-middle.cc	2013-10-16 15:01:08.000000000 +0800
-@@ -136,6 +136,13 @@
+   class PhyMacLowListener * m_phyMacLowListener; //!< Listerner needed to monitor when a channel switching occurs.
+ 
+diff -rpuN ns-3.21-backup/src/wifi/model/mac-rx-middle.cc ns-3.21/src/wifi/model/mac-rx-middle.cc
+--- ns-3.21-backup/src/wifi/model/mac-rx-middle.cc	2014-12-02 20:51:56.818845923 +0800
++++ ns-3.21/src/wifi/model/mac-rx-middle.cc	2014-12-02 21:21:25.214993277 +0800
+@@ -191,6 +191,13 @@ MacRxMiddle::SetForwardCallback (Forward
    m_callback = callback;
  }
  
@@ -140,7 +140,7 @@ diff -ur original/ns-3.18/src/wifi/model/mac-rx-middle.cc ns-3.18/src/wifi/model
  OriginatorRxStatus *
  MacRxMiddle::Lookup (const WifiMacHeader *hdr)
  {
-@@ -285,4 +292,47 @@
+@@ -340,4 +347,47 @@ MacRxMiddle::Receive (Ptr<Packet> packet
    m_callback (agregate, hdr);
  }
  
@@ -188,19 +188,20 @@ diff -ur original/ns-3.18/src/wifi/model/mac-rx-middle.cc ns-3.18/src/wifi/model
 +}
 +
  } // namespace ns3
-
-diff -ur original/ns-3.18/src/wifi/model/mac-rx-middle.h ns-3.18/src/wifi/model/mac-rx-middle.h
---- original/ns-3.18/src/wifi/model/mac-rx-middle.h	2013-08-30 13:36:59.000000000 +0800
-+++ ns-3.18/src/wifi/model/mac-rx-middle.h	2013-10-16 14:53:58.000000000 +0800
-@@ -41,13 +41,16 @@
- {
- public:
+diff -rpuN ns-3.21-backup/src/wifi/model/mac-rx-middle.h ns-3.21/src/wifi/model/mac-rx-middle.h
+--- ns-3.21-backup/src/wifi/model/mac-rx-middle.h	2014-12-02 20:51:56.816845932 +0800
++++ ns-3.21/src/wifi/model/mac-rx-middle.h	2014-12-02 21:21:25.215993272 +0800
+@@ -44,6 +44,7 @@ public:
+    * typedef for callback
+    */
    typedef Callback<void, Ptr<Packet>, const WifiMacHeader*> ForwardUpCallback;
 +  typedef Callback<void, Ptr<Packet>, const WifiMacHeader*,  double> ForwardUpSnrCallback;
  
    MacRxMiddle ();
    ~MacRxMiddle ();
- 
+@@ -54,8 +55,10 @@ public:
+    * \param callback
+    */
    void SetForwardCallback (ForwardUpCallback callback);
 +  void SetForwardSnrCallback (ForwardUpSnrCallback callback);
  
@@ -208,8 +209,8 @@ diff -ur original/ns-3.18/src/wifi/model/mac-rx-middle.h ns-3.18/src/wifi/model/
 +  void SnrReceive (Ptr<Packet> packet, const WifiMacHeader *hdr, double rxSnr);
  private:
    friend class MacRxMiddleTest;
-   OriginatorRxStatus* Lookup (const WifiMacHeader* hdr);
-@@ -62,6 +65,7 @@
+   /**
+@@ -113,6 +116,7 @@ private:
    Originators m_originatorStatus;
    QosOriginators m_qosOriginatorStatus;
    ForwardUpCallback m_callback;
@@ -217,10 +218,9 @@ diff -ur original/ns-3.18/src/wifi/model/mac-rx-middle.h ns-3.18/src/wifi/model/
  };
  
  } // namespace ns3
-
-diff -ur original/ns-3.18/src/wifi/model/sta-wifi-mac.cc ns-3.18/src/wifi/model/sta-wifi-mac.cc
---- original/ns-3.18/src/wifi/model/sta-wifi-mac.cc	2013-08-30 13:36:59.000000000 +0800
-+++ ns-3.18/src/wifi/model/sta-wifi-mac.cc	2013-10-16 15:27:47.000000000 +0800
+diff -rpuN ns-3.21-backup/src/wifi/model/sta-wifi-mac.cc ns-3.21/src/wifi/model/sta-wifi-mac.cc
+--- ns-3.21-backup/src/wifi/model/sta-wifi-mac.cc	2014-12-02 20:51:56.815845937 +0800
++++ ns-3.21/src/wifi/model/sta-wifi-mac.cc	2014-12-02 21:21:25.215993272 +0800
 @@ -26,6 +26,7 @@
  #include "ns3/string.h"
  #include "ns3/pointer.h"
@@ -229,10 +229,10 @@ diff -ur original/ns-3.18/src/wifi/model/sta-wifi-mac.cc ns-3.18/src/wifi/model/
  #include "ns3/trace-source-accessor.h"
  
  #include "qos-tag.h"
-@@ -59,6 +60,39 @@
-  */
+@@ -60,6 +61,47 @@ NS_LOG_COMPONENT_DEFINE ("StaWifiMac");
  
  namespace ns3 {
+ 
 +class PhyStaMacListener : public ns3::WifiPhyListener
 +{
 +public:
@@ -255,6 +255,13 @@ diff -ur original/ns-3.18/src/wifi/model/sta-wifi-mac.cc ns-3.18/src/wifi/model/
 +  virtual void NotifyTxStart (Time duration)
 +  {
 +  }
++  virtual void NotifyTxStart (Time duration, double txPowerDbm)
++  {
++  }
++  virtual void NotifySleep (void){
++  }
++  virtual void NotifyWakeup (void){
++  }
 +  virtual void NotifyMaybeCcaBusyStart (Time duration)
 +  {
 +    m_staMac->NotifyCcaBusyOccurred ();
@@ -266,12 +273,13 @@ diff -ur original/ns-3.18/src/wifi/model/sta-wifi-mac.cc ns-3.18/src/wifi/model/
 +private:
 +  ns3::StaWifiMac *m_staMac;
 +};
- 
++
  NS_OBJECT_ENSURE_REGISTERED (StaWifiMac);
  
-@@ -86,6 +120,28 @@
+ TypeId
+@@ -86,6 +128,28 @@ StaWifiMac::GetTypeId (void)
                     BooleanValue (false),
-                    MakeBooleanAccessor (&StaWifiMac::SetActiveProbing),
+                    MakeBooleanAccessor (&StaWifiMac::SetActiveProbing, &StaWifiMac::GetActiveProbing),
                     MakeBooleanChecker ())
 +    .AddAttribute ("ScanType",
 +                   "The type of scanning for a BSS.",
@@ -298,7 +306,7 @@ diff -ur original/ns-3.18/src/wifi/model/sta-wifi-mac.cc ns-3.18/src/wifi/model/
      .AddTraceSource ("Assoc", "Associated with an access point.",
                       MakeTraceSourceAccessor (&StaWifiMac::m_assocLogger))
      .AddTraceSource ("DeAssoc", "Association with an access point lost.",
-@@ -98,10 +154,20 @@
+@@ -98,10 +162,21 @@ StaWifiMac::StaWifiMac ()
    : m_state (BEACON_MISSED),
      m_probeRequestEvent (),
      m_assocRequestEvent (),
@@ -317,13 +325,15 @@ diff -ur original/ns-3.18/src/wifi/model/sta-wifi-mac.cc ns-3.18/src/wifi/model/
 +  m_rxMiddle->SetForwardSnrCallback (MakeCallback (&StaWifiMac::SnrReceive, this));
 +  m_low->SetSnrRxCallback (MakeCallback (&MacRxMiddle::SnrReceive, m_rxMiddle));
 +
++
    // Let the lower layers know that we are acting as a non-AP STA in
    // an infrastructure BSS.
    SetTypeOfStation (STA);
-@@ -113,6 +179,21 @@
+@@ -112,6 +187,21 @@ StaWifiMac::~StaWifiMac ()
+   NS_LOG_FUNCTION (this);
  }
  
- void
++ void
 +StaWifiMac::SetWifiPhy (Ptr<WifiPhy> phy)
 +{
 +  RegularWifiMac::SetWifiPhy (phy);
@@ -338,11 +348,10 @@ diff -ur original/ns-3.18/src/wifi/model/sta-wifi-mac.cc ns-3.18/src/wifi/model/
 +  m_phyStaMacListener = NULL;
 +}
 +
-+void
+ void
  StaWifiMac::SetMaxMissedBeacons (uint32_t missed)
  {
-   NS_LOG_FUNCTION (this << missed);
-@@ -266,6 +347,8 @@
+@@ -275,6 +365,8 @@ StaWifiMac::TryToEnsureAssociated (void)
           association with a given ssid.
         */
        break;
@@ -351,7 +360,7 @@ diff -ur original/ns-3.18/src/wifi/model/sta-wifi-mac.cc ns-3.18/src/wifi/model/
      }
  }
  
-@@ -286,6 +369,27 @@
+@@ -295,6 +387,27 @@ StaWifiMac::ProbeRequestTimeout (void)
  }
  
  void
@@ -379,7 +388,7 @@ diff -ur original/ns-3.18/src/wifi/model/sta-wifi-mac.cc ns-3.18/src/wifi/model/
  StaWifiMac::MissedBeacons (void)
  {
    NS_LOG_FUNCTION (this);
-@@ -299,9 +403,7 @@
+@@ -308,9 +421,7 @@ StaWifiMac::MissedBeacons (void)
                                                &StaWifiMac::MissedBeacons, this);
        return;
      }
@@ -390,7 +399,7 @@ diff -ur original/ns-3.18/src/wifi/model/sta-wifi-mac.cc ns-3.18/src/wifi/model/
  }
  
  void
-@@ -336,7 +438,7 @@
+@@ -345,7 +456,7 @@ StaWifiMac::Enqueue (Ptr<const Packet> p
    if (!IsAssociated ())
      {
        NotifyTxDrop (packet);
@@ -399,10 +408,10 @@ diff -ur original/ns-3.18/src/wifi/model/sta-wifi-mac.cc ns-3.18/src/wifi/model/
        return;
      }
    WifiMacHeader hdr;
-@@ -645,4 +747,181 @@
+@@ -653,5 +764,181 @@ StaWifiMac::SetState (MacState value)
+     }
    m_state = value;
  }
- 
 +void
 +StaWifiMac::SetupStaMacListener (Ptr<WifiPhy> phy)
 +{
@@ -579,16 +588,16 @@ diff -ur original/ns-3.18/src/wifi/model/sta-wifi-mac.cc ns-3.18/src/wifi/model/
 +  entry.rxSnr = rxSnr;
 +  m_scanResults.push_back (entry);
 +}
-+
+ 
  } // namespace ns3
-
-diff -ur original/ns-3.18/src/wifi/model/sta-wifi-mac.h ns-3.18/src/wifi/model/sta-wifi-mac.h
---- original/ns-3.18/src/wifi/model/sta-wifi-mac.h	2013-08-30 13:36:59.000000000 +0800
-+++ ns-3.18/src/wifi/model/sta-wifi-mac.h	2013-10-16 15:12:52.000000000 +0800
-@@ -43,6 +43,21 @@
+diff -rpuN ns-3.21-backup/src/wifi/model/sta-wifi-mac.h ns-3.21/src/wifi/model/sta-wifi-mac.h
+--- ns-3.21-backup/src/wifi/model/sta-wifi-mac.h	2014-12-02 20:51:56.815845937 +0800
++++ ns-3.21/src/wifi/model/sta-wifi-mac.h	2014-12-02 21:21:25.215993272 +0800
+@@ -43,6 +43,23 @@ class MgtAddBaRequestHeader;
  class StaWifiMac : public RegularWifiMac
  {
  public:
++
 +  enum MacScanType
 +  {
 +    NOTSUPPORT,
@@ -604,22 +613,23 @@ diff -ur original/ns-3.18/src/wifi/model/sta-wifi-mac.h ns-3.18/src/wifi/model/s
 +    double rxSnr;
 +  };
 +  typedef Callback<void, std::vector<ScanningEntry> const & > ScanningCallback;
++
    static TypeId GetTypeId (void);
  
    StaWifiMac ();
-@@ -59,6 +74,11 @@
+@@ -57,7 +74,10 @@ public:
+    * access is granted to this MAC.
+    */
    virtual void Enqueue (Ptr<const Packet> packet, Mac48Address to);
- 
-   /**
+-
++  /**
 +   * \param phy the physical layer attached to this MAC.
 +   */
 +  virtual void SetWifiPhy (Ptr<WifiPhy> phy);
-+
-+  /**
+   /**
     * \param missed the number of beacons which must be missed
     * before a new association sequence is started.
-    */
-@@ -83,6 +103,23 @@
+@@ -83,6 +103,23 @@ public:
     */
    void StartActiveAssociation (void);
  
@@ -641,9 +651,9 @@ diff -ur original/ns-3.18/src/wifi/model/sta-wifi-mac.h ns-3.18/src/wifi/model/s
 +  virtual void DoDispose ();
 +
  private:
-   enum MacState
-   {
-@@ -90,7 +127,8 @@
+   /**
+    * The current MAC state of the STA.
+@@ -93,7 +130,8 @@ private:
      WAIT_PROBE_RESP,
      WAIT_ASSOC_RESP,
      BEACON_MISSED,
@@ -652,9 +662,9 @@ diff -ur original/ns-3.18/src/wifi/model/sta-wifi-mac.h ns-3.18/src/wifi/model/s
 +    SCANNING
    };
  
-   void SetActiveProbing (bool enable);
-@@ -110,6 +148,15 @@
- 
+   /**
+@@ -178,6 +216,15 @@ private:
+    */
    HtCapabilities GetHtCapabilities (void) const;
  
 +  void SetupStaMacListener (Ptr<WifiPhy> phy);
@@ -669,9 +679,9 @@ diff -ur original/ns-3.18/src/wifi/model/sta-wifi-mac.h ns-3.18/src/wifi/model/s
  
    enum MacState m_state;
    Time m_probeRequestTimeout;
-@@ -120,6 +167,17 @@
-   Time m_beaconWatchdogEnd;
+@@ -189,6 +236,17 @@ private:
    uint32_t m_maxMissedBeacons;
+   bool m_activeProbing;
  
 +  class PhyStaMacListener * m_phyStaMacListener;
 +  MacScanType m_scanType;
