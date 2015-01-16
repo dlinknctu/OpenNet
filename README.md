@@ -12,8 +12,8 @@ Feature
 Prerequisite
 ------------
 * Fedora 21 3.17.6-300.fc21.x86\_64
-1. Fetch [Mininet](https://github.com/mininet/mininet "Mininet") <br/>
-<pre>$ git clone https://github.com/mininet/mininet.git</pre>
+1. Fetch [Mininet 2.2.0](https://github.com/mininet/mininet "Mininet") <br/>
+<pre>$ git clone https://github.com/mininet/mininet.git -b 2.2.0</pre>
 2. Fetch [ns-3.21](http://www.nsnam.org/ns-3-21 "ns-3.21") <br/>
 <pre>
 $ curl -O -k https://www.nsnam.org/release/ns-allinone-3.21.tar.bz2
