@@ -12,6 +12,7 @@ Feature
 Prerequisite
 ------------
 * Fedora 21 3.17.6-300.fc21.x86\_64
+  - NOTE: Fedora ONLY. DO NOT use Ubunutu since there is an [unresolved issue](https://www.nsnam.org/bugzilla/show_bug.cgi?id=1990) using ns-3.21 with Ubuntu.
 1. Fetch [Mininet 2.2.0](https://github.com/mininet/mininet "Mininet") <br/>
 <pre>$ git clone https://github.com/mininet/mininet.git -b 2.2.0</pre>
 2. Fetch [ns-3.21](http://www.nsnam.org/ns-3-21 "ns-3.21") <br/>
