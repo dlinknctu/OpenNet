@@ -61,7 +61,7 @@ $ sudo sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
 $ sudo systemctl stop firewalld.service
 $ sudo systemctl disable firewalld.service
 $ sudo setenforce 0
-$ sudo systemctl enable openvwitch.service
+$ sudo systemctl enable openvswitch.service
 $ sudo systemctl start openvswitch.service
 </pre>
 b. Add ns3.py into mininet
@@ -103,7 +103,10 @@ d. Build ns-3
 Run OpenNet
 -----------
 <pre>
-Launch a controller at localhost:6633
+Launch a controller at localhost:6633,
+for example, a POX controller installed with Mininet can be running with:
+$ python pox.py forwarding.l2\_learning
+
 $ cd $ns/ns-3.21
 $ ./waf shell
 $ cd $mn/examples
