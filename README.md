@@ -50,33 +50,34 @@ at line 115, change gccxml\_path='' into gccxml\_path='/usr/local/bin'
 
 Install OpenNet
 ---------------
+* $mn: Directory of Mininet, $ns: Directory of ns-allinone-3.21, $on: Directory of OpenNet
 1. Install, patch and rebuild Mininet <br/>
 a. Install mininet
 <pre>
-$ cd mininet
+$ cd $mn
 $ git checkout tags/2.2.0b3
 $ sudo util/install.sh -fnpv
 $ sudo sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
 $ sudo systemctl stop firewalld.service
 $ sudo systemctl disable firewalld.service
 $ sudo setenforce 0
-$ sudo systemctl enable openvwitch.service
+$ sudo systemctl enable openvswitch.service
 $ sudo systemctl start openvswitch.service
 </pre>
-b. Add ns3.py into mininet/mininet
-<pre>$ cp OpenNet/mininet-patch/mininet/ns3.py mininet/mininet</pre>
+b. Add ns3.py into mininet
+<pre>$ cp $on/mininet-patch/mininet/ns3.py $mn/mininet</pre>
 c. Replace mininet/node.py with the one in mininet-patch
-<pre>$ cp OpenNet/mininet-patch/mininet/node.py mininet/mininet</pre>
+<pre>$ cp $on/mininet-patch/mininet/node.py $mn/mininet</pre>
 d. Add WiFi roaming simulation script to example
-<pre>$ cp OpenNet/mininet-patch/examples/wifiroaming.py mininet/examples</pre>
+<pre>$ cp $on/mininet-patch/examples/wifiroaming.py $mn/examples</pre>
 e. Rebuild Mininet
 <pre>$ sudo util/install.sh -n</pre>
 
-2. Install, patch and rebuild ns-3 <br/>
+2. Install, patch and Build ns-3 <br/>
 a. Copy patches to the ns-3.21 folder
 <pre>
-$ cd ns-allinone-3.21/ns-3.21
-`$ cp OpenNet/ns3-patch/*.patch .`
+$ cd $ns/ns-3.21
+`$ cp $on/ns3-patch/*.patch .`
 </pre>
 b. Apply patches
 <pre>
@@ -96,16 +97,19 @@ c. Scan python API
 $ ./waf --apiscan=netanim
 $ ./waf --apiscan=wifi
 </pre>
-d. Rebuild ns-3
+d. Build ns-3
 <pre>$ ./waf build</pre>
 
 Run OpenNet
 -----------
 <pre>
-Launch a controller at localhost:6633
-$ cd ns-allinone-3.21/ns-3.21
+Launch a controller at localhost:6633,
+for example, a POX controller installed with Mininet can be running with:
+$ python pox.py forwarding.l2\_learning
+
+$ cd $ns/ns-3.21
 $ ./waf shell
-$ cd ../../mininet/examples
+$ cd $mn/examples
 $ python wifiroaming.py
 </pre>
 
