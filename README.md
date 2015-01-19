@@ -9,8 +9,14 @@ Feature
 * Show CsmaLink and SimpleLink in NetAnim (animation-interface.patch)
 * Fix runtime error when access PacketMetadata of CsmaLink [Submitted](https://www.nsnam.org/bugzilla/show_bug.cgi?id=1787, "ns-3 bugzilla issue 1787")
 
-Prerequisite
-------------
+Use OpenNet from VM image
+-------------------------
+* OpenNet 1.1 VM image: [Download Link](http://win.cs.nctu.edu.tw/opennet-1.1.zip)
+    - user: nctuopennet
+    - pw: nctuopennet
+
+Build OpenNet on your own
+-------------------------
 * Fedora 21 3.17.6-300.fc21.x86\_64
   - NOTE: Fedora ONLY. DO NOT use Ubunutu since there is an [unresolved issue](https://www.nsnam.org/bugzilla/show_bug.cgi?id=1990) using ns-3.21 with Ubuntu.
 1. Fetch [Mininet 2.2.0](https://github.com/mininet/mininet "Mininet") <br/>
