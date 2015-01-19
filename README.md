@@ -44,7 +44,8 @@ $ ln /usr/local/bin/gccxml /bin/gccxml
 </pre>
 6. Modify pygccxml parser configuration <br/>
 <pre>
-sed -e "s/gccxml\_path=''/gccxml\_path='\/usr\/local\/bin'/" -i /usr/lib/python2.7/site-packages/pygccxml/parser/config.py
+$ sed -e "s/gccxml\_path=''/gccxml\_path='\/usr\/local\/bin'/" \ 
+-i /usr/lib/python2.7/site-packages/pygccxml/parser/config.py
 </pre>
 
 Install OpenNet
