@@ -15,6 +15,9 @@ Use OpenNet from VM image
     - user: nctuopennet
     - pw: nctuopennet
 
+With this VM image, please following the instruction in the "Run OpenNet" section to start the simulation.<br/>
+OpenNet and corresponding tools can be found under "/home/nctuopennet/workspace".<br/>
+
 Build OpenNet on your own
 -------------------------
 * Fedora 21 3.17.6-300.fc21.x86\_64
@@ -51,8 +54,8 @@ $ ln /usr/local/bin/gccxml /bin/gccxml
 </pre>
 6. Modify pygccxml parser configuration <br/>
 <pre>
-In the /usr/lib/python2.7/site-packages/pygccxml/parser/config.py,
-at line 115, change gccxml\_path='' into gccxml\_path='/usr/local/bin'
+$ sed -e "s/gccxml\_path=''/gccxml\_path='\/usr\/local\/bin'/" \ 
+-i /usr/lib/python2.7/site-packages/pygccxml/parser/config.py
 </pre>
 
 Install OpenNet
