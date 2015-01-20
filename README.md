@@ -1,16 +1,13 @@
-OpenNet
-=======
+# OpenNet
 A simulator built on top of Mininet and ns-3 for Software-Defined Wireless Local Area Network (SDWLAN)<br/>
 http://www.slideshare.net/rascov/20140824-open-net
 
-Feature
--------
+## Feature
 * Complement ns-3 by supporting channel scan behavior on Wi-Fi station (sta-wifi-scan.patch)
 * Show CsmaLink and SimpleLink in NetAnim (animation-interface.patch)
 * Fix runtime error when access PacketMetadata of CsmaLink [Submitted](https://www.nsnam.org/bugzilla/show_bug.cgi?id=1787, "ns-3 bugzilla issue 1787")
 
-Use OpenNet from VM image
--------------------------
+## (Option 1) Use OpenNet from VM image
 * OpenNet 1.1 VM image: [Download Link](http://win.cs.nctu.edu.tw/opennet-1.1.zip)
     - user: nctuopennet
     - pw: nctuopennet
@@ -18,8 +15,8 @@ Use OpenNet from VM image
 With this VM image, please following the instruction in the "Run OpenNet" section to start the simulation.<br/>
 OpenNet and corresponding tools can be found under "/home/nctuopennet/workspace".<br/>
 
-Build OpenNet on your own
--------------------------
+## (Option 2) Build OpenNet on your own
+### Prerequisite
 * Fedora 21 3.17.6-300.fc21.x86\_64
   - NOTE: Fedora ONLY. DO NOT use Ubunutu since there is an [unresolved issue](https://www.nsnam.org/bugzilla/show_bug.cgi?id=1990) using ns-3.21 with Ubuntu.
 1. Fetch [Mininet 2.2.0](https://github.com/mininet/mininet "Mininet") <br/>
@@ -58,8 +55,7 @@ $ sed -e "s/gccxml\_path=''/gccxml\_path='\/usr\/local\/bin'/" \
 -i /usr/lib/python2.7/site-packages/pygccxml/parser/config.py
 </pre>
 
-Install OpenNet
----------------
+### Install OpenNet
 * $mn: Directory of Mininet, $ns: Directory of ns-allinone-3.21, $on: Directory of OpenNet
 1. Install, patch and rebuild Mininet <br/>
 a. Install mininet
@@ -110,8 +106,7 @@ $ ./waf --apiscan=wifi
 d. Build ns-3
 <pre>$ ./waf build</pre>
 
-Run OpenNet
------------
+## Run OpenNet
 <pre>
 Launch a controller at localhost:6633,
 for example, a POX controller installed with Mininet can be running with:
@@ -123,6 +118,5 @@ $ cd $mn/examples
 $ python wifiroaming.py
 </pre>
 
-Reference
----------
+## Reference
 * Link modeling using ns-3 [Link](https://github.com/mininet/mininet/wiki/Link-modeling-using-ns-3 "Link modeling using ns-3")
