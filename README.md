@@ -14,6 +14,9 @@ Use OpenNet from VM image
 * OpenNet 1.1 VM image: [Download Link](http://win.cs.nctu.edu.tw/opennet-1.1.zip)
     - user: nctuopennet
     - pw: nctuopennet
+OpenNet and corresponding tools can be found under /home/nctuopennet/workspace.
+With this VM image, please following the instruction in the "Run OpenNet" 
+section to start the simulation.
 
 Build OpenNet on your own
 -------------------------
