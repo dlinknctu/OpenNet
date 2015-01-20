@@ -17,28 +17,28 @@ OpenNet and corresponding tools can be found under "/home/nctuopennet/workspace"
 
 ## (Option 2) Build OpenNet on your own
 ### Prerequisite
-* Fedora 21 3.17.6-300.fc21.x86\_64
+1. Fedora 21 3.17.6-300.fc21.x86\_64
   - NOTE: Fedora ONLY. DO NOT use Ubunutu since there is an [unresolved issue](https://www.nsnam.org/bugzilla/show_bug.cgi?id=1990) using ns-3.21 with Ubuntu.
-1. Fetch [Mininet 2.2.0](https://github.com/mininet/mininet "Mininet") <br/>
+2. Fetch [Mininet 2.2.0](https://github.com/mininet/mininet "Mininet") <br/>
 <pre>$ git clone https://github.com/mininet/mininet.git -b 2.2.0</pre>
-2. Fetch [ns-3.21](http://www.nsnam.org/ns-3-21 "ns-3.21") <br/>
+3. Fetch [ns-3.21](http://www.nsnam.org/ns-3-21 "ns-3.21") <br/>
 <pre>
 $ curl -O -k https://www.nsnam.org/release/ns-allinone-3.21.tar.bz2
 $ tar xf ns-allinone-3.21.tar.bz2
 </pre>
-3. Install packages for ns-3.21 <br/>
+4. Install packages for ns-3.21 <br/>
 <pre>
 $ sudo yum install gcc gcc-c++ python python-devel
 $ sudo yum install make cmake glibc-devel.i686 glibc-devel.x86\_64
 </pre>
-4. Fetch and install [pygccxml](http://sourceforge.net/projects/pygccxml/files/pygccxml/pygccxml-1.0/pygccxml-1.0.0.zip/download "pygccxml-1.0.0") <br/>
+5. Fetch and install [pygccxml](http://sourceforge.net/projects/pygccxml/files/pygccxml/pygccxml-1.0/pygccxml-1.0.0.zip/download "pygccxml-1.0.0") <br/>
 <pre>
 $ unzip pygccxml-1.0.0.zip
 $ cd pygccxml-1.0.0
 $ python setup.py build
 $ sudo python setup.py install
 </pre>
-5. Install gccxml <br/>
+6. Install gccxml <br/>
 <pre>
 $ git clone https://github.com/gccxml/gccxml.git
 $ cd gccxml
@@ -49,16 +49,16 @@ $ make
 $ sudo make install
 $ ln /usr/local/bin/gccxml /bin/gccxml
 </pre>
-6. Modify pygccxml parser configuration <br/>
+7. Modify pygccxml parser configuration <br/>
 <pre>
 $ sed -e "s/gccxml\_path=''/gccxml\_path='\/usr\/local\/bin'/" \ 
 -i /usr/lib/python2.7/site-packages/pygccxml/parser/config.py
 </pre>
 
 ### Install OpenNet
-* $mn: Directory of Mininet, $ns: Directory of ns-allinone-3.21, $on: Directory of OpenNet
-1. Install, patch and rebuild Mininet <br/>
-a. Install mininet
+1. $mn: Directory of Mininet, $ns: Directory of ns-allinone-3.21, $on: Directory of OpenNet
+2. Install, patch and rebuild Mininet <br/>
+a. Install mininet <br/>
 <pre>
 $ cd $mn
 $ git checkout tags/2.2.0b3
@@ -70,40 +70,40 @@ $ sudo setenforce 0
 $ sudo systemctl enable openvswitch.service
 $ sudo systemctl start openvswitch.service
 </pre>
-b. Add ns3.py into mininet
+b. Add ns3.py into mininet <br/>
 <pre>$ cp $on/mininet-patch/mininet/ns3.py $mn/mininet</pre>
-c. Replace mininet/node.py with the one in mininet-patch
+c. Replace mininet/node.py with the one in mininet-patch <br/>
 <pre>$ cp $on/mininet-patch/mininet/node.py $mn/mininet</pre>
-d. Add WiFi roaming simulation script to example
+d. Add WiFi roaming simulation script to example <br/>
 <pre>$ cp $on/mininet-patch/examples/wifiroaming.py $mn/examples</pre>
-e. Rebuild Mininet
+e. Rebuild Mininet <br/>
 <pre>$ sudo util/install.sh -n</pre>
 
-2. Install, patch and Build ns-3 <br/>
-a. Copy patches to the ns-3.21 folder
+3. Install, patch and Build ns-3 <br/>
+a. Copy patches to the ns-3.21 folder <br/>
 <pre>
 $ cd $ns/ns-3.21
 `$ cp $on/ns3-patch/*.patch .`
 </pre>
-b. Apply patches
+b. Apply patches <br/>
 <pre>
 $ patch -p1 &lt; animation-interface.patch
 $ patch -p1 &lt; netanim-python.patch
 $ patch -p1 &lt; sta-wifi-scan.patch
 </pre>
-c. Configure ns-3
+c. Configure ns-3 <br/>
 <pre>
 $ ./waf configure
 Make sure
 Python Bindings               : enabled
 Python API Scanning Support   : enabled
 </pre>
-c. Scan python API
+c. Scan python API <br/>
 <pre>
 $ ./waf --apiscan=netanim
 $ ./waf --apiscan=wifi
 </pre>
-d. Build ns-3
+d. Build ns-3 <br/>
 <pre>$ ./waf build</pre>
 
 ## Run OpenNet
