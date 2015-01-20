@@ -58,7 +58,7 @@ $ sed -e "s/gccxml\_path=''/gccxml\_path='\/usr\/local\/bin'/" \
 ### Install OpenNet
 * $mn: Directory of Mininet, $ns: Directory of ns-allinone-3.21, $on: Directory of OpenNet
 1. Install, patch and rebuild Mininet <br/>
-a. Install mininet
+a. Install mininet <br/>
 <pre>
 $ cd $mn
 $ git checkout tags/2.2.0b3
@@ -70,40 +70,40 @@ $ sudo setenforce 0
 $ sudo systemctl enable openvswitch.service
 $ sudo systemctl start openvswitch.service
 </pre>
-b. Add ns3.py into mininet
+b. Add ns3.py into mininet <br/>
 <pre>$ cp $on/mininet-patch/mininet/ns3.py $mn/mininet</pre>
-c. Replace mininet/node.py with the one in mininet-patch
+c. Replace mininet/node.py with the one in mininet-patch <br/>
 <pre>$ cp $on/mininet-patch/mininet/node.py $mn/mininet</pre>
-d. Add WiFi roaming simulation script to example
+d. Add WiFi roaming simulation script to example <br/>
 <pre>$ cp $on/mininet-patch/examples/wifiroaming.py $mn/examples</pre>
-e. Rebuild Mininet
+e. Rebuild Mininet <br/>
 <pre>$ sudo util/install.sh -n</pre>
 
 2. Install, patch and Build ns-3 <br/>
-a. Copy patches to the ns-3.21 folder
+a. Copy patches to the ns-3.21 folder <br/>
 <pre>
 $ cd $ns/ns-3.21
 `$ cp $on/ns3-patch/*.patch .`
 </pre>
-b. Apply patches
+b. Apply patches <br/>
 <pre>
 $ patch -p1 &lt; animation-interface.patch
 $ patch -p1 &lt; netanim-python.patch
 $ patch -p1 &lt; sta-wifi-scan.patch
 </pre>
-c. Configure ns-3
+c. Configure ns-3 <br/>
 <pre>
 $ ./waf configure
 Make sure
 Python Bindings               : enabled
 Python API Scanning Support   : enabled
 </pre>
-c. Scan python API
+c. Scan python API <br/>
 <pre>
 $ ./waf --apiscan=netanim
 $ ./waf --apiscan=wifi
 </pre>
-d. Build ns-3
+d. Build ns-3 <br/>
 <pre>$ ./waf build</pre>
 
 ## Run OpenNet
