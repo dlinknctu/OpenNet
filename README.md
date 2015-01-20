@@ -15,8 +15,7 @@ Use OpenNet from VM image
     - user: nctuopennet
     - pw: nctuopennet
 
-With this VM image, please following the instruction in the "Run OpenNet"<br/>
-section to start the simulation.
+With this VM image, please following the instruction in the "Run OpenNet" section to start the simulation.<br/>
 OpenNet and corresponding tools can be found under "/home/nctuopennet/workspace".<br/>
 
 Build OpenNet on your own
