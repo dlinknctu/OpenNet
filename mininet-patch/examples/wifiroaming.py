@@ -78,12 +78,6 @@ def WifiNet():
     wifi = WifiSegment(standard = ns.wifi.WIFI_PHY_STANDARD_80211g)
     wifinodes = []
 
-    rv = os.path.isdir("/tmp/xml")
-    if rv is False:
-        os.mkdir("/tmp/xml")    
-    anim = ns.netanim.AnimationInterface("/tmp/xml/wifi-wired-bridged4.xml")
-    anim.EnablePacketMetadata (True)
-    
     for n in nodes:
         nodename = n.get('name', None)
         nodetype = n.get('type', None)
@@ -108,8 +102,6 @@ def WifiNet():
         if nodevel is not None:
             mininet.ns3.setVelocity (node, nodevel[0], nodevel[1], nodevel[2])
         wifinodes.append (node)
-        anim.UpdateNodeDescription (node.nsNode, nodename+'-'+str(node.nsNode.GetId()))
-        anim.UpdateNodeColor (node.nsNode, color[0], color[1], color[2])
 
     for wi in wifiintfs:
         winodename = wi.get('nodename', None)
@@ -144,6 +136,16 @@ def WifiNet():
         os.mkdir("/tmp/pcap")
     ns.wifi.YansWifiPhyHelper().Default().EnablePcapAll("/tmp/pcap/wifi")
     ns.csma.CsmaHelper().EnablePcapAll("/tmp/pcap/csma")
+    
+    rv = os.path.isdir("/tmp/xml")
+    if rv is False:
+        os.mkdir("/tmp/xml")    
+    anim = ns.netanim.AnimationInterface("/tmp/xml/wifi-wired-bridged4.xml")
+    anim.EnablePacketMetadata (True)
+    
+    for n in nodes:
+        anim.UpdateNodeDescription (node.nsNode, nodename+'-'+str(node.nsNode.GetId()))
+        anim.UpdateNodeColor (node.nsNode, color[0], color[1], color[2])
 
     info( '*** Starting network\n' )
     net.start()
