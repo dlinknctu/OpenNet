@@ -99,9 +99,7 @@ $ sudo util/install.sh -n
 a. Copy patches to the ns-3.21 folder <br/>
 <pre>
 $ cd $ns/ns-3.21
-$ cp $on/ns3-patch/animation-interface.patch .
-$ cp $on/ns3-patch/netanim-python.patch .
-$ cp $on/ns3-patch/sta-wifi-scan.patch .
+`$ cp $on/ns3-patch/*.patch .`
 </pre>
 b. Apply patches <br/>
 <pre>
@@ -109,7 +107,7 @@ $ patch -p1 &lt; animation-interface.patch
 $ patch -p1 &lt; netanim-python.patch
 $ patch -p1 &lt; sta-wifi-scan.patch
 </pre>
-c. Fix the wscript error in the tap-bridge <br/>
+c. Patch the wscript for [issue] (https://www.nsnam.org/bugzilla/show_bug.cgi?id=1990) about using ns-3.21 with Ubuntu<br/>
 <pre>
 $ sed -e "s/\['network'\]/\['internet', 'network', 'core'\]/" -i src/tap-bridge/wscript
 </pre>
@@ -144,4 +142,3 @@ $ sudo python wifiroaming.py
 
 ## Reference
 * Link modeling using ns-3 [Link] (https://github.com/mininet/mininet/wiki/Link-modeling-using-ns-3 "Link modeling using ns-3")
-* The [issue] (https://www.nsnam.org/bugzilla/show_bug.cgi?id=1990) about using ns-3.21 with Ubuntu
