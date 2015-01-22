@@ -99,7 +99,9 @@ $ sudo util/install.sh -n
 a. Copy patches to the ns-3.21 folder <br/>
 <pre>
 $ cd $ns/ns-3.21
-`$ cp $on/ns3-patch/*.patch .`
+$ cp $on/ns3-patch/animation-interface.patch .
+$ cp $on/ns3-patch/netanim-python.patch .
+$ cp $on/ns3-patch/sta-wifi-scan.patch .
 </pre>
 b. Apply patches <br/>
 <pre>
