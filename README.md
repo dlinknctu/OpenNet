@@ -132,7 +132,7 @@ $ ./waf build
 <pre>
 Launch a controller at localhost:6633,
 for example, a POX controller installed with Mininet can be running with:
-$ sudo python pox.py forwarding.l2\_learning
+$ sudo python pox.py forwarding.l2_learning
 
 $ cd $ns/ns-3.21
 $ sudo ./waf shell
