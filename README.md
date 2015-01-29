@@ -137,7 +137,7 @@ $ sudo python pox.py forwarding.l2_learning
 $ cd $ns/ns-3.21
 $ sudo ./waf shell
 $ cd $mn/examples
-$ sudo python wifiroaming.py
+$ python wifiroaming.py
 </pre>
 
 ## Reference
