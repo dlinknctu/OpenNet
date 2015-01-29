@@ -1,5 +1,5 @@
 """
-From Mininet branch 2.2.0b3
+From Mininet 2.2.0b3
 """
 """
 Node objects for Mininet.
