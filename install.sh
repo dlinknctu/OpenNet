@@ -20,9 +20,9 @@ function detect_os {
     test -e /etc/fedora-release && DIST="Fedora"
     test -e /etc/centos-release && DIST="CentOS"
     if [ "$DIST" = "Fedora" ] || [ "$DIST" = "CentOS" ]; then
-        install='sudo yum -y install'
-        remove='sudo yum -y erase'
-        pkginst='sudo rpm -ivh'
+        install='yum -y install'
+        remove='yum -y erase'
+        pkginst='rpm -ivh'
         # Prereqs for this script
         if ! which lsb_release &> /dev/null; then
             $install redhat-lsb-core
@@ -36,9 +36,9 @@ function detect_os {
 
     grep Ubuntu /etc/lsb-release &> /dev/null && DIST="Ubuntu"
     if [ "$DIST" = "Ubuntu" ] ; then
-        install='sudo apt-get -y install'
-        remove='sudo apt-get -y remove'
-        pkginst='sudo dpkg -i'
+        install='apt-get -y install'
+        remove='apt-get -y remove'
+        pkginst='dpkg -i'
         # Prereqs for this script
         if ! which lsb_release &> /dev/null; then
             $install lsb-release
@@ -135,7 +135,6 @@ function gccxml {
 function enviroment {
 
     echo "Prepare Enviroment"
-    wget https://bitbucket.org/pypa/setuptools/raw/bootstrap/ez_setup.py -O - | python
     if [ "$DIST" = "Fedora" ] || [ "$DIST" = "CentOS" ]; then
         $install make git vim ssh unzip curl gcc wget \
         gcc-c++ python python-devel cmake glibc-devel.i686 glibc-devel.x86_64 net-tools \
@@ -153,6 +152,7 @@ function enviroment {
         patch dpkg-dev libssl-dev libncurses5-dev libpcre3-dev graphviz python-all \
         python-qt4 python-zopeinterface python-twisted-conch
     fi
+    wget https://bitbucket.org/pypa/setuptools/raw/bootstrap/ez_setup.py -O - | python
 
 }
 
@@ -182,7 +182,7 @@ function opennet {
 }
 function finish {
 
-    echo "\$ sudo $ROOT_PATH/ns-allinone/ns-3.21/waf shell"
+    echo "\$ $ROOT_PATH/ns-allinone-3.21/ns-3.21/waf shell"
     echo "\$ cd $ROOT_PATH/mininet/examples"
     echo "\$ python wifiroaming.py"
 
