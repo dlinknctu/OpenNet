@@ -1,8 +1,12 @@
 #!/bin/bash
+#==============================================================================
+#title           : install.sh
+#description     : This script will install OpenNet
+#                  Support Ubuntu 14.04.1 and CentOS 7
+#==============================================================================
 
 set -o nounset
 set -e
-set -x
 
 ROOT_PATH=`pwd`
 OVS_RELEASE='2.3.1'
@@ -29,10 +33,23 @@ function detect_os {
         RELEASE=`lsb_release -rs`
         CODENAME=`lsb_release -cs`
     fi
+
+    grep Ubuntu /etc/lsb-release &> /dev/null && DIST="Ubuntu"
+    if [ "$DIST" = "Ubuntu" ] ; then
+        install='sudo apt-get -y install'
+        remove='sudo apt-get -y remove'
+        pkginst='sudo dpkg -i'
+        # Prereqs for this script
+        if ! which lsb_release &> /dev/null; then
+            $install lsb-release
+        fi
+    fi
     echo "Detected Linux distribution: $DIST $RELEASE $CODENAME"
+
 }
 
 function mininet {
+
     echo "Fetch Mininet"
     cd $ROOT_PATH
     if [ ! -d mininet ]; then
@@ -42,12 +59,30 @@ function mininet {
     cd $ROOT_PATH/mininet && git checkout tags/$MININET_VERSION
     cp $ROOT_PATH/mininet-patch/util/install.sh $ROOT_PATH/mininet/util/
     ./util/install.sh -fn
-    mkdir -p $ROOT_PATH/rpmbuild/SOURCES/ && cd $ROOT_PATH/rpmbuild/SOURCES/
-    wget http://openvswitch.org/releases/openvswitch-$OVS_RELEASE.tar.gz
-    tar zxvf openvswitch-$OVS_RELEASE.tar.gz && cd openvswitch-$OVS_RELEASE
-    rpmbuild -bb --define "_topdir $ROOT_PATH/rpmbuild" --without check rhel/openvswitch.spec
-    rpm -ivh --nodeps $ROOT_PATH/rpmbuild/RPMS/x86_64/openvswitch*.rpm
-    /etc/init.d/openvswitch start
+
+}
+
+function openvswitch {
+
+    cd $ROOT_PATH
+    if [ "$DIST" = "Ubuntu" ]; then
+        wget http://openvswitch.org/releases/openvswitch-$OVS_RELEASE.tar.gz
+        tar zxvf openvswitch-$OVS_RELEASE.tar.gz && cd openvswitch-$OVS_RELEASE
+        #TODO Need to integrate *deb
+        dpkg-checkbuilddeps
+        fakeroot debian/rules binary
+        dpkg -i $ROOT_PATH/openvswitch-switch_$OVS_RELEASE-1_amd64.deb $ROOT_PATH/openvswitch-common_$OVS_RELEASE-1_amd64.deb
+    fi
+
+    if [ "$DIST" = "CentOS" ] || [ "$DIST" = "Fedora" ]; then
+        mkdir -p $ROOT_PATH/rpmbuild/SOURCES/ && cd $ROOT_PATH/rpmbuild/SOURCES/
+        wget http://openvswitch.org/releases/openvswitch-$OVS_RELEASE.tar.gz
+        tar zxvf openvswitch-$OVS_RELEASE.tar.gz && cd openvswitch-$OVS_RELEASE
+        rpmbuild -bb --define "_topdir $ROOT_PATH/rpmbuild" --without check rhel/openvswitch.spec
+        rpm -ivh --nodeps $ROOT_PATH/rpmbuild/RPMS/x86_64/openvswitch*.rpm
+        /etc/init.d/openvswitch start
+    fi
+
 }
 
 function ns3 {
@@ -75,6 +110,10 @@ function pygccxml {
         sed -e "s/gccxml\_path=''/gccxml\_path='\/usr\/local\/bin'/" -i /usr/lib/python2.7/site-packages/pygccxml/parser/config.py
     fi
 
+    if [ "$DIST" = "Ubuntu" ]; then
+        sed -e "s/gccxml_path=''/gccxml_path='\/usr\/local\/bin'/" -i /usr/local/lib/python2.7/dist-packages/pygccxml/parser/config.py
+    fi
+
 }
 
 function gccxml {
@@ -96,15 +135,24 @@ function gccxml {
 function enviroment {
 
     echo "Prepare Enviroment"
-    $install make git vim ssh unzip curl gcc wget \
-    gcc-c++ python python-devel cmake glibc-devel.i686 glibc-devel.x86_64 net-tools \
-    make python-devel openssl-devel kernel-devel graphviz kernel-debug-devel autoconf \
-    automake rpm-build redhat-rpm-config libtool 
+    wget https://bitbucket.org/pypa/setuptools/raw/bootstrap/ez_setup.py -O - | python
+    if [ "$DIST" = "Fedora" ] || [ "$DIST" = "CentOS" ]; then
+        $install make git vim ssh unzip curl gcc wget \
+        gcc-c++ python python-devel cmake glibc-devel.i686 glibc-devel.x86_64 net-tools \
+        make python-devel openssl-devel kernel-devel graphviz kernel-debug-devel \
+        autoconf automake rpm-build redhat-rpm-config libtool
 
-    sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
-    systemctl stop firewalld.service
-    systemctl disable firewalld.service
-    setenforce 0
+        sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
+        systemctl stop firewalld.service
+        systemctl disable firewalld.service
+        setenforce 0
+    fi
+    if [ "$DIST" = "Ubuntu" ] ; then
+        $install gcc g++ python python-dev make cmake gcc-4.8-multilib g++-4.8-multilib \
+        python-setuptools unzip curl build-essential debhelper make autoconf automake \
+        patch dpkg-dev libssl-dev libncurses5-dev libpcre3-dev graphviz python-all \
+        python-qt4 python-zopeinterface python-twisted-conch
+    fi
 
 }
 
@@ -141,26 +189,33 @@ function finish {
 }
 
 function all {
+
     detect_os
     enviroment
     pygccxml
     gccxml
     ns3
     mininet
+    openvswitch
     opennet
     finish
+
 }
 
 
 function usage {
+
     echo
     echo Usage: $(basename $0) -[$PARA] >&2
+    echo "-a: Install OpenNet World"
+    echo "-f: Finish message"
     echo
     exit 2
+
 }
 
 
-PARA='amdhenpgo'
+PARA='amdhenpgosf'
 if [ $# -eq 0 ]
 then
     usage
@@ -177,6 +232,8 @@ else
         p)  pygccxml;;
         g)  gccxml;;
         o)  opennet;;
+        s)  openvswitch;;
+        f)  finish;;
         esac
     done
     shift $(($OPTIND - 1))
