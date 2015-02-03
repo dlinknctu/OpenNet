@@ -49,17 +49,17 @@ function mininet {
     wget http://openvswitch.org/releases/openvswitch-$OVS_RELEASE.tar.gz
     tar zxvf openvswitch-$OVS_RELEASE.tar.gz && cd openvswitch-$OVS_RELEASE
     rpmbuild -bb --define "_topdir $ROOT_PATH/rpmbuild" --without check rhel/openvswitch.spec
-    rpm -ivh --nodeps $ROOTP_PATH/rpmbuild/RPMS/x86_64/openvswitch*.rpm
-    systemctl enable openvwitch.service
-    systemctl start openvswitch.service
+    rpm -ivh --nodeps $ROOT_PATH/rpmbuild/RPMS/x86_64/openvswitch*.rpm
+    /etc/init.d/openvswitch start
 }
-
 
 function ns3 {
 
     echo "Fetch ns-3.21"
     cd $ROOT_PATH
-    curl -O -k https://www.nsnam.org/release/ns-allinone-3.21.tar.bz2
+    if [ ! -f ns-allinone-3.21.tar.bz2 ]; then
+        curl -O -k https://www.nsnam.org/release/ns-allinone-3.21.tar.bz2
+    fi
     tar xf ns-allinone-3.21.tar.bz2
 
 }
@@ -68,11 +68,15 @@ function pygccxml {
 
     echo "Fetch and install pygccxml"
     cd $ROOT_PATH
-    if [ ! -d pygccxml-1.0.0.zip ]; then 
+    if [ ! -f pygccxml-1.0.0.zip ]; then
         wget http://nchc.dl.sourceforge.net/project/pygccxml/pygccxml/pygccxml-1.0/pygccxml-1.0.0.zip
     fi
     unzip -o pygccxml-1.0.0.zip && cd $ROOT_PATH/pygccxml-1.0.0
     python setup.py install
+
+    if [ "$DIST" = "CentOS" ]; then
+        sed -e "s/gccxml\_path=''/gccxml\_path='\/usr\/local\/bin'/" -i /usr/lib/python2.7/site-packages/pygccxml/parser/config.py
+    fi
 
 }
 
@@ -88,6 +92,7 @@ function gccxml {
     cmake ../
     make
     make install
+    ln -s /usr/local/bin/gccxml /bin/gccxml
 
 }
 
@@ -108,20 +113,18 @@ function enviroment {
 }
 
 function opennet {
+
     echo "Install OpenNet"
     cd $ROOT_PATH
-    git clone https://github.com/dlinknctu/OpenNet.git
-    git checkout dev
-    #TODO use patch
-    cp OpenNet/mininet-patch/mininet/ns3.py mininet/mininet
-    cp OpenNet/mininet-patch/mininet/node.py mininet/mininet
-    cp OpenNet/mininet-patch/examples/wifiroaming.py mininet/examples
+    cp mininet-patch/mininet/ns3.py mininet/mininet
+    cp mininet-patch/mininet/node.py mininet/mininet
+    cp mininet-patch/examples/wifiroaming.py mininet/examples
 
     #rebuild mininet
     $ROOT_PATH/mininet/util/install.sh -n
 
     #patch
-    cp $ROOT_PATH/OpenNet/ns3-patch/*.patch $ROOT_PATH/ns-allinone-3.21/ns-3.21
+    cp $ROOT_PATH/ns3-patch/*.patch $ROOT_PATH/ns-allinone-3.21/ns-3.21
     cd $ROOT_PATH/ns-allinone-3.21/ns-3.21
     patch -p1 < animation-interface.patch
     patch -p1 < netanim-python.patch
@@ -132,7 +135,14 @@ function opennet {
     ./waf --apiscan=wifi
     ./waf build
 
+    echo "\$ cd $ROOT_PATH/ns-allinone/ns-3.21"
+    echo "\$ sudo ./waf shell"
+    echo "\$ cd $ROOT_PATH/mininet/examples"
+    echo "\$ python wifiroaming.py"
+
+
 }
+
 
 function usage {
     echo
@@ -141,7 +151,7 @@ function usage {
     exit 2
 }
 
-PARA='amdhe'
+PARA='amdhenpgo'
 if [ $# -eq 0 ]
 then
     usage
@@ -154,6 +164,10 @@ else
         d)  detect_os;;
         h)  usage;;
         e)  enviroment;;
+        n)  ns3;;
+        p)  pygccxml;;
+        g)  gccxml;;
+        o)  opennet;;
         esac
     done
     shift $(($OPTIND - 1))
