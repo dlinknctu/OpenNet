@@ -121,7 +121,7 @@ function kernel_clean {
 # Install Mininet deps
 function mn_deps {
     echo "Installing Mininet dependencies"
-    if [ "$DIST" = "Fedora" ]; then
+    if [ "$DIST" = "Fedora" ] || [ "$DIST" = "CentOS" ]; then
         $install gcc make socat psmisc xterm openssh-clients iperf \
             iproute telnet python-setuptools libcgroup-tools \
             ethtool help2man pyflakes pylint python-pep8
