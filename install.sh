@@ -2,7 +2,7 @@
 #==============================================================================
 #title           : install.sh
 #description     : This script will install OpenNet
-#                  Support Ubuntu 14.04.1 and CentOS 7
+#                  Support Ubuntu 14.04.1, CentOS 7, Fedora 21
 #==============================================================================
 
 set -o nounset
@@ -182,10 +182,12 @@ function opennet {
 }
 function finish {
 
-    echo "\$ cd $ROOT_PATH/ns-allinone-3.21/ns-3.21/"
-    echo "./waf shell"
-    echo "\$ cd $ROOT_PATH/mininet/examples"
-    echo "\$ python wifiroaming.py"
+    echo " OpenNet installation complete."
+    echo " Please try following commands to run the simulation/"
+    echo " \$ cd $ROOT_PATH/ns-allinone-3.21/ns-3.21/"
+    echo " \$ ./waf shell"
+    echo " \$ cd $ROOT_PATH/mininet/examples"
+    echo " \$ python wifiroaming.py"
 
 }
 
