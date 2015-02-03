@@ -10,14 +10,11 @@ MININET_VERSION='2.2.0'
 DIST=Unknown
 RELEASE=Unknown
 CODENAME=Unknown
-ARCH=`uname -m`
 
 function detect_os {
-    if [ "$ARCH" = "x86_64" ]; then ARCH="amd64"; fi
-    if [ "$ARCH" = "i686" ]; then ARCH="i386"; fi
 
     test -e /etc/fedora-release && DIST="Fedora"
-    grep CentOS /etc/redhat-release &> /dev/null && DIST="CentOS"
+    test -e /etc/centos-release && DIST="CentOS"
     if [ "$DIST" = "Fedora" ] || [ "$DIST" = "CentOS" ]; then
         install='sudo yum -y install'
         remove='sudo yum -y erase'
@@ -32,7 +29,7 @@ function detect_os {
         RELEASE=`lsb_release -rs`
         CODENAME=`lsb_release -cs`
     fi
-    echo "Detected Linux distribution: $DIST $RELEASE $CODENAME $ARCH"
+    echo "Detected Linux distribution: $DIST $RELEASE $CODENAME"
 }
 
 function mininet {
@@ -41,9 +38,10 @@ function mininet {
     if [ ! -d mininet ]; then
         git clone https://github.com/mininet/mininet.git
     fi
+
+    cp mininet-patch/util/install.sh mininet/util/
     cd $ROOT_PATH/mininet && git checkout tags/$MININET_VERSION
 
-    #TODO need mininet_install.sh patch
     ./util/install.sh -fn
     mkdir -p $ROOT_PATH/rpmbuild/SOURCES/ && cd $ROOT_PATH/rpmbuild/SOURCES/
     wget http://openvswitch.org/releases/openvswitch-$OVS_RELEASE.tar.gz
@@ -116,9 +114,9 @@ function opennet {
 
     echo "Install OpenNet"
     cd $ROOT_PATH
-    cp mininet-patch/mininet/ns3.py mininet/mininet
-    cp mininet-patch/mininet/node.py mininet/mininet
-    cp mininet-patch/examples/wifiroaming.py mininet/examples
+    cp mininet-patch/mininet/ns3.py mininet/mininet/
+    cp mininet-patch/mininet/node.py mininet/mininet/
+    cp mininet-patch/examples/wifiroaming.py mininet/examples/
 
     #rebuild mininet
     $ROOT_PATH/mininet/util/install.sh -n
@@ -135,12 +133,24 @@ function opennet {
     ./waf --apiscan=wifi
     ./waf build
 
-    echo "\$ cd $ROOT_PATH/ns-allinone/ns-3.21"
-    echo "\$ sudo ./waf shell"
+}
+function finish {
+
+    echo "\$ sudo $ROOT_PATH/ns-allinone/ns-3.21/waf shell"
     echo "\$ cd $ROOT_PATH/mininet/examples"
     echo "\$ python wifiroaming.py"
 
+}
 
+function all {
+    detect_os
+    enviroment
+    pygccxml
+    gccxml
+    ns3
+    mininet
+    opennet
+    finish
 }
 
 
@@ -150,6 +160,7 @@ function usage {
     echo
     exit 2
 }
+
 
 PARA='amdhenpgo'
 if [ $# -eq 0 ]
