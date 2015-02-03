@@ -182,7 +182,8 @@ function opennet {
 }
 function finish {
 
-    echo "\$ $ROOT_PATH/ns-allinone-3.21/ns-3.21/waf shell"
+    echo "\$ cd $ROOT_PATH/ns-allinone-3.21/ns-3.21/"
+    echo "./waf shell"
     echo "\$ cd $ROOT_PATH/mininet/examples"
     echo "\$ python wifiroaming.py"
 
