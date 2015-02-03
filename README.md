@@ -16,10 +16,15 @@ With this VM image, please following the instruction in the "Run OpenNet" sectio
 OpenNet and corresponding tools can be found under "/home/nctuopennet/workspace".<br/>
 
 ## (Option 2) Use install.sh
-* Support CentOS 7 and Ubuntu 14.04.1 now.<br/>
+
 <pre>
 ./install.sh -a
 </pre>
+
+* Support
+  * CentOS 7
+  * Ubuntu 14.04.1
+  * Fedora 21
 
 ## (Option 3) Build OpenNet on your own
 ### Prerequisite
