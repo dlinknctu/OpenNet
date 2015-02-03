@@ -39,9 +39,8 @@ function mininet {
         git clone https://github.com/mininet/mininet.git
     fi
 
-    cp mininet-patch/util/install.sh mininet/util/
     cd $ROOT_PATH/mininet && git checkout tags/$MININET_VERSION
-
+    cp $ROOT_PATH/mininet-patch/util/install.sh $ROOT_PATH/mininet/util/
     ./util/install.sh -fn
     mkdir -p $ROOT_PATH/rpmbuild/SOURCES/ && cd $ROOT_PATH/rpmbuild/SOURCES/
     wget http://openvswitch.org/releases/openvswitch-$OVS_RELEASE.tar.gz
@@ -97,8 +96,7 @@ function gccxml {
 function enviroment {
 
     echo "Prepare Enviroment"
-    yum update
-    yum install -y make git vim ssh unzip curl gcc wget \
+    $install make git vim ssh unzip curl gcc wget \
     gcc-c++ python python-devel cmake glibc-devel.i686 glibc-devel.x86_64 net-tools \
     make python-devel openssl-devel kernel-devel graphviz kernel-debug-devel autoconf \
     automake rpm-build redhat-rpm-config libtool 
