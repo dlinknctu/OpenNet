@@ -174,6 +174,10 @@ function opennet {
     patch -p1 < netanim-python.patch
     patch -p1 < sta-wifi-scan.patch
 
+    if [ "$DIST" = "Ubuntu" ]; then
+        sed -e "s/\['network'\]/\['internet', 'network', 'core'\]/" -i src/tap-bridge/wscript
+    fi
+
     ./waf configure
     ./waf --apiscan=netanim
     ./waf --apiscan=wifi
