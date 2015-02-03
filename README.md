@@ -15,7 +15,13 @@ http://www.slideshare.net/rascov/20140824-open-net <br/>
 With this VM image, please following the instruction in the "Run OpenNet" section to start the simulation.<br/>
 OpenNet and corresponding tools can be found under "/home/nctuopennet/workspace".<br/>
 
-## (Option 2) Build OpenNet on your own
+## (Option 2) Use install.sh
+* Support CentOS 7 and Ubuntu 14.04.1 now.<br/>
+<pre>
+./install.sh -a
+</pre>
+
+## (Option 3) Build OpenNet on your own
 ### Prerequisite
 1. Fedora 21 3.17.6-300.fc21.x86\_64 or Ubuntu 14.04.1 3.13.0-43-generic <br/>
 2. Fetch [Mininet 2.2.0] (https://github.com/mininet/mininet "Mininet") <br/>
