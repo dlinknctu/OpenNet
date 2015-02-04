@@ -9,8 +9,10 @@ set -o nounset
 set -e
 
 ROOT_PATH=`pwd`
-OVS_RELEASE='2.3.1'
+OVS_VERSION='2.3.1'
 MININET_VERSION='2.2.0'
+NS3_VERSION='3.21'
+PYGCCXML_VERSION='1.0.0'
 DIST=Unknown
 RELEASE=Unknown
 CODENAME=Unknown
@@ -66,18 +68,18 @@ function openvswitch {
 
     cd $ROOT_PATH
     if [ "$DIST" = "Ubuntu" ]; then
-        wget http://openvswitch.org/releases/openvswitch-$OVS_RELEASE.tar.gz
-        tar zxvf openvswitch-$OVS_RELEASE.tar.gz && cd openvswitch-$OVS_RELEASE
+        wget http://openvswitch.org/releases/openvswitch-$OVS_VERSION.tar.gz
+        tar zxvf openvswitch-$OVS_VERSION.tar.gz && cd openvswitch-$OVS_VERSION
         #TODO Need to integrate *deb
         dpkg-checkbuilddeps
         fakeroot debian/rules binary
-        dpkg -i $ROOT_PATH/openvswitch-switch_$OVS_RELEASE-1_amd64.deb $ROOT_PATH/openvswitch-common_$OVS_RELEASE-1_amd64.deb
+        dpkg -i $ROOT_PATH/openvswitch-switch_$OVS_VERSION-1_amd64.deb $ROOT_PATH/openvswitch-common_$OVS_VERSION-1_amd64.deb
     fi
 
     if [ "$DIST" = "CentOS" ] || [ "$DIST" = "Fedora" ]; then
         mkdir -p $ROOT_PATH/rpmbuild/SOURCES/ && cd $ROOT_PATH/rpmbuild/SOURCES/
-        wget http://openvswitch.org/releases/openvswitch-$OVS_RELEASE.tar.gz
-        tar zxvf openvswitch-$OVS_RELEASE.tar.gz && cd openvswitch-$OVS_RELEASE
+        wget http://openvswitch.org/releases/openvswitch-$OVS_VERSION.tar.gz
+        tar zxvf openvswitch-$OVS_VERSION.tar.gz && cd openvswitch-$OVS_VERSION
         rpmbuild -bb --define "_topdir $ROOT_PATH/rpmbuild" --without check rhel/openvswitch.spec
         rpm -ivh --nodeps $ROOT_PATH/rpmbuild/RPMS/x86_64/openvswitch*.rpm
         /etc/init.d/openvswitch start
@@ -87,12 +89,12 @@ function openvswitch {
 
 function ns3 {
 
-    echo "Fetch ns-3.21"
+    echo "Fetch ns-$NS3_VERSION"
     cd $ROOT_PATH
-    if [ ! -f ns-allinone-3.21.tar.bz2 ]; then
-        curl -O -k https://www.nsnam.org/release/ns-allinone-3.21.tar.bz2
+    if [ ! -f ns-allinone-$NS3_VERSION.tar.bz2 ]; then
+        curl -O -k https://www.nsnam.org/release/ns-allinone-$NS3_VERSION.tar.bz2
     fi
-    tar xf ns-allinone-3.21.tar.bz2
+    tar xf ns-allinone-$NS3_VERSION.tar.bz2
 
 }
 
@@ -100,10 +102,10 @@ function pygccxml {
 
     echo "Fetch and install pygccxml"
     cd $ROOT_PATH
-    if [ ! -f pygccxml-1.0.0.zip ]; then
-        wget http://nchc.dl.sourceforge.net/project/pygccxml/pygccxml/pygccxml-1.0/pygccxml-1.0.0.zip
+    if [ ! -f pygccxml-$PYGCCXML_VERSION.zip ]; then
+        wget http://nchc.dl.sourceforge.net/project/pygccxml/pygccxml/pygccxml-1.0/pygccxml-$PYGCCXML_VERSION.zip
     fi
-    unzip -o pygccxml-1.0.0.zip && cd $ROOT_PATH/pygccxml-1.0.0
+    unzip -o pygccxml-$PYGCCXML_VERSION.zip && cd $ROOT_PATH/pygccxml-$PYGCCXML_VERSION
     python setup.py install
 
     if [ "$DIST" = "CentOS" ]; then
