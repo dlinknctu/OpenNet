@@ -1,1 +1,1 @@
-script: ./install.sh
+script: ./install.sh -a
