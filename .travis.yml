@@ -1,1 +1,1 @@
-script: ./install.sh -a
+script: sudo ./install.sh -a
