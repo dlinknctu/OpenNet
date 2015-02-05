@@ -108,7 +108,7 @@ function pygccxml {
     unzip -o pygccxml-$PYGCCXML_VERSION.zip && cd $ROOT_PATH/pygccxml-$PYGCCXML_VERSION
     python setup.py install
 
-    if [ "$DIST" = "CentOS" ]; then
+    if [ "$DIST" = "Fedora" ] || [ "$DIST" = "CentOS" ]; then
         sed -e "s/gccxml\_path=''/gccxml\_path='\/usr\/local\/bin'/" -i /usr/lib/python2.7/site-packages/pygccxml/parser/config.py
     fi
 
