@@ -130,7 +130,9 @@ function gccxml {
     cmake ../
     make
     make install
-    ln -s /usr/local/bin/gccxml /bin/gccxml
+    if [ ! -L /bin/gccxml ]; then
+        ln -s /usr/local/bin/gccxml /bin/gccxml
+    fi
 
 }
 
@@ -138,15 +140,18 @@ function enviroment {
 
     echo "Prepare Enviroment"
     if [ "$DIST" = "Fedora" ] || [ "$DIST" = "CentOS" ]; then
-        $install make git vim ssh unzip curl gcc wget \
+        $install make git vim openssh openssh-server unzip curl gcc wget \
         gcc-c++ python python-devel cmake glibc-devel.i686 glibc-devel.x86_64 net-tools \
         make python-devel openssl-devel kernel-devel graphviz kernel-debug-devel \
         autoconf automake rpm-build redhat-rpm-config libtool
 
-        sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
+        SELINUX_STATUS="$(grep SELINUX=disabled /etc/selinux/config)"
+        if [ $? -eq 1 ]; then
+            sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
+            setenforce 0
+        fi
         systemctl stop firewalld.service
         systemctl disable firewalld.service
-        setenforce 0
     fi
     if [ "$DIST" = "Ubuntu" ] ; then
         $install gcc g++ python python-dev make cmake gcc-4.8-multilib g++-4.8-multilib \
