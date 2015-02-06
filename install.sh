@@ -81,7 +81,7 @@ function openvswitch {
         wget http://openvswitch.org/releases/openvswitch-$OVS_VERSION.tar.gz
         tar zxvf openvswitch-$OVS_VERSION.tar.gz && cd openvswitch-$OVS_VERSION
         rpmbuild -bb --define "_topdir $ROOT_PATH/rpmbuild" --without check rhel/openvswitch.spec
-        rpm -ivh --nodeps $ROOT_PATH/rpmbuild/RPMS/x86_64/openvswitch*.rpm
+        rpm -ivh --replacepkgs --replacefiles --nodeps $ROOT_PATH/rpmbuild/RPMS/x86_64/openvswitch*.rpm
         /etc/init.d/openvswitch start
     fi
 
