@@ -768,9 +768,7 @@ class WifiSegment( object ):
             allNodes.append( node )
         phyHelper.SetChannel (channel = self.channel)
         device = self.wifiHelper.Install (phyHelper, macHelper, node.nsNode).Get(0)
-        node.nsNode.AddDevice (device)
         device.SetAddress (ns.network.Mac48Address.Allocate ())
-        node.nsNode.AddDevice (device)
         if port is None:
             port = node.newPort()
         if intfName is None:
