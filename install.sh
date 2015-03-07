@@ -13,6 +13,7 @@ OVS_VERSION='2.3.1'
 MININET_VERSION='2.2.0'
 NS3_VERSION='3.21'
 PYGCCXML_VERSION='1.0.0'
+NETANIM_VERSION='3.105'
 DIST=Unknown
 RELEASE=Unknown
 CODENAME=Unknown
@@ -143,7 +144,8 @@ function enviroment {
         $install make git vim openssh openssh-server unzip curl gcc wget \
         gcc-c++ python python-devel cmake glibc-devel.i686 glibc-devel.x86_64 net-tools \
         make python-devel openssl-devel kernel-devel graphviz kernel-debug-devel \
-        autoconf automake rpm-build redhat-rpm-config libtool
+        autoconf automake rpm-build redhat-rpm-config libtool \
+        mercurial qt4 qt4-devel qt-devel qt-config
 
         SELINUX_STATUS="$(grep SELINUX=disabled /etc/selinux/config)"
         if [ $? -eq 1 ]; then
@@ -157,7 +159,8 @@ function enviroment {
         $install gcc g++ python python-dev make cmake gcc-4.8-multilib g++-4.8-multilib \
         python-setuptools unzip curl build-essential debhelper make autoconf automake \
         patch dpkg-dev libssl-dev libncurses5-dev libpcre3-dev graphviz python-all \
-        python-qt4 python-zopeinterface python-twisted-conch
+        python-qt4 python-zopeinterface python-twisted-conch \
+        qt4-dev-tools
     fi
     wget https://bitbucket.org/pypa/setuptools/raw/bootstrap/ez_setup.py -O - | python
 
@@ -191,6 +194,15 @@ function opennet {
     ./waf build
 
 }
+
+function netanim {
+
+    echo "Build NetAnim"
+    cd $ROOT_PATH/ns-allinone-$NS3_VERSION/netanim-$NETANIM_VERSION
+    qmake-qt4 NetAnim.pro
+    make
+}
+
 function finish {
 
     echo " OpenNet installation complete."
@@ -209,6 +221,7 @@ function all {
     pygccxml
     gccxml
     ns3
+    natanim
     mininet
     openvswitch
     opennet
@@ -229,7 +242,7 @@ function usage {
 }
 
 
-PARA='amdhenpgosf'
+PARA='amdhenipgosf'
 if [ $# -eq 0 ]
 then
     usage
@@ -243,6 +256,7 @@ else
         h)  usage;;
         e)  enviroment;;
         n)  ns3;;
+        i)  netanim;;
         p)  pygccxml;;
         g)  gccxml;;
         o)  opennet;;

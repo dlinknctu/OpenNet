@@ -79,7 +79,7 @@ $ sudo sed -e "s/gccxml\_path=''/gccxml\_path='\/usr\/local\/bin'/" -i /usr/loca
 a. Install mininet  
 <pre>
 $ cd $mn
-$ git checkout tags/2.2.0b3
+$ git checkout tags/2.2.0
 $ sudo util/install.sh -fnpv
 Fedora:
 $ sudo sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
@@ -149,6 +149,15 @@ $ cd $ns/ns-3.21
 $ sudo ./waf shell
 $ cd $mn/examples
 $ python wifiroaming.py
+</pre>
+
+## Run NetAnim
+<pre>
+$ cd $ns/netanim-3.105
+$ ./NetAnim
+
+Use NetAnim to open the XML file in the directory /tmp/xml
+Click "Play Animation" button can start the animation
 </pre>
 
 ## Reference
