@@ -221,7 +221,7 @@ function all {
     pygccxml
     gccxml
     ns3
-    natanim
+    netanim
     mininet
     openvswitch
     opennet
