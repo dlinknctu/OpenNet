@@ -7,7 +7,7 @@ http://www.slideshare.net/rascov/20140824-open-net
 * Show CsmaLink and SimpleLink in NetAnim (animation-interface.patch)
 * Fix runtime error when access PacketMetadata of CsmaLink [Submitted] (https://www.nsnam.org/bugzilla/show_bug.cgi?id=1787, "ns-3 bugzilla issue 1787")
 
-## (Option 1) Use OpenNet from VM image
+## Use OpenNet VM image
 * OpenNet 1.1 VM image (Fedora 21) : [Download Link] (http://win.cs.nctu.edu.tw/opennet-1.1.zip)
     - user: nctuopennet
     - pw: nctuopennet
@@ -15,7 +15,7 @@ http://www.slideshare.net/rascov/20140824-open-net
 With this VM image, please following the instruction in the "Run OpenNet" section to start the simulation.  
 OpenNet and corresponding tools can be found under "/home/nctuopennet/workspace".  
 
-## (Option 2) Use install.sh
+## Build OpenNet on your own - Use install.sh
 
 <pre>
 ./install.sh -a
@@ -26,7 +26,7 @@ OpenNet and corresponding tools can be found under "/home/nctuopennet/workspace"
   * Ubuntu 14.04.1
   * Fedora 21
 
-## (Option 3) Build OpenNet on your own
+## (NOT RECOMMENDED) Build OpenNet on your own - Step by step
 ### Prerequisite
 1. Fedora 21 3.17.6-300.fc21.x86\_64 or Ubuntu 14.04.1 3.13.0-43-generic  
 2. Fetch [Mininet 2.2.0] (https://github.com/mininet/mininet "Mininet")  
