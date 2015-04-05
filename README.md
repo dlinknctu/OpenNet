@@ -33,12 +33,12 @@ OpenNet and corresponding tools can be found under "/home/nctuopennet/workspace"
 <pre>
 $ git clone https://github.com/mininet/mininet.git
 </pre>
-3. Fetch [ns-3.21] (http://www.nsnam.org/ns-3-21 "ns-3.21")  
+3. Fetch [ns-3.22] (http://www.nsnam.org/ns-3-22 "ns-3.22")  
 <pre>
-$ curl -O -k https://www.nsnam.org/release/ns-allinone-3.21.tar.bz2
-$ tar xf ns-allinone-3.21.tar.bz2
+$ curl -O -k https://www.nsnam.org/release/ns-allinone-3.22.tar.bz2
+$ tar xf ns-allinone-3.22.tar.bz2
 </pre>
-4. Install packages for ns-3.21  
+4. Install packages for ns-3.22
 <pre>
 Fedora:
 $ sudo yum install gcc gcc-c++ python python-devel
@@ -74,7 +74,7 @@ $ sudo sed -e "s/gccxml\_path=''/gccxml\_path='\/usr\/local\/bin'/" -i /usr/loca
 </pre>
 
 ### Install OpenNet
-1. $mn: Directory of Mininet, $ns: Directory of ns-allinone-3.21, $on: Directory of OpenNet  
+1. $mn: Directory of Mininet, $ns: Directory of ns-allinone-3.22, $on: Directory of OpenNet  
 2. Install, patch and rebuild Mininet  
 a. Install mininet  
 <pre>
@@ -107,9 +107,9 @@ $ sudo util/install.sh -n
 </pre>
 
 3. Install, patch and Build ns-3  
-a. Copy patches to the ns-3.21 folder  
+a. Copy patches to the ns-3.22 folder  
 <pre>
-$ cd $ns/ns-3.21
+$ cd $ns/ns-3.22
 `$ cp $on/ns3-patch/*.patch .`
 </pre>
 b. Apply patches  
@@ -118,7 +118,7 @@ $ patch -p1 &lt; animation-interface.patch
 $ patch -p1 &lt; netanim-python.patch
 $ patch -p1 &lt; sta-wifi-scan.patch
 </pre>
-c. Patch the wscript for [issue] (https://www.nsnam.org/bugzilla/show_bug.cgi?id=1990) about using ns-3.21 with Ubuntu  
+c. Patch the wscript for [issue] (https://www.nsnam.org/bugzilla/show_bug.cgi?id=1990) about using ns-3.22 with Ubuntu  
 <pre>
 $ sed -e "s/\['network'\]/\['internet', 'network', 'core'\]/" -i src/tap-bridge/wscript
 </pre>
@@ -145,7 +145,7 @@ Launch a controller at localhost:6633,
 for example, a POX controller installed with Mininet can be running with:
 $ sudo python pox.py forwarding.l2_learning
 
-$ cd $ns/ns-3.21
+$ cd $ns/ns-3.22
 $ sudo ./waf shell
 $ cd $mn/examples
 $ python wifiroaming.py

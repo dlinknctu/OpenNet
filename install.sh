@@ -11,7 +11,7 @@ set -e
 ROOT_PATH=`pwd`
 OVS_VERSION='2.3.1'
 MININET_VERSION='2.2.0'
-NS3_VERSION='3.21'
+NS3_VERSION='3.22'
 PYGCCXML_VERSION='1.0.0'
 NETANIM_VERSION='3.105'
 DIST=Unknown
@@ -178,8 +178,8 @@ function opennet {
     $ROOT_PATH/mininet/util/install.sh -n
 
     #patch
-    cp $ROOT_PATH/ns3-patch/*.patch $ROOT_PATH/ns-allinone-3.21/ns-3.21
-    cd $ROOT_PATH/ns-allinone-3.21/ns-3.21
+    cp $ROOT_PATH/ns3-patch/*.patch $ROOT_PATH/ns-allinone-$NS3_VERSION/ns-$NS3_VERSION
+    cd $ROOT_PATH/ns-allinone-$NS3_VERSION/ns-$NS3_VERSION
     patch -p1 < animation-interface.patch
     patch -p1 < netanim-python.patch
     patch -p1 < sta-wifi-scan.patch
@@ -207,7 +207,7 @@ function finish {
 
     echo " OpenNet installation complete."
     echo " Please try following commands to run the simulation/"
-    echo " \$ cd $ROOT_PATH/ns-allinone-3.21/ns-3.21/"
+    echo " \$ cd $ROOT_PATH/ns-allinone-$NS3_VERSION/ns-$NS3_VERSION/"
     echo " \$ ./waf shell"
     echo " \$ cd $ROOT_PATH/mininet/examples"
     echo " \$ python wifiroaming.py"
