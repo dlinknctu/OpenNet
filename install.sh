@@ -72,9 +72,9 @@ function openvswitch {
         wget http://openvswitch.org/releases/openvswitch-$OVS_VERSION.tar.gz
         tar zxvf openvswitch-$OVS_VERSION.tar.gz && cd openvswitch-$OVS_VERSION
         #TODO Need to integrate *deb
-        dpkg-checkbuilddeps
-        fakeroot debian/rules binary
-        dpkg -i $ROOT_PATH/openvswitch-switch_$OVS_VERSION-1_amd64.deb $ROOT_PATH/openvswitch-common_$OVS_VERSION-1_amd64.deb
+        DEB_BUILD_OPTIONS='parallel=2 nocheck' fakeroot debian/rules binary
+        dpkg -i $ROOT_PATH/openvswitch-switch_$OVS_VERSION*.deb $ROOT_PATH/openvswitch-common_$OVS_VERSION*.deb \
+                $ROOT_PATH/openvswitch-pki_$OVS_VERSION*.deb
     fi
 
     if [ "$DIST" = "CentOS" ] || [ "$DIST" = "Fedora" ]; then
