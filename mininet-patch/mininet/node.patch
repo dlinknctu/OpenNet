@@ -1,0 +1,18 @@
+diff --git a/mininet/node.py b/mininet/node.py
+index 544fae3..c864719 100644
+--- a/mininet/node.py
++++ b/mininet/node.py
+@@ -423,8 +423,11 @@ def addIntf( self, intf, port=None, moveIntfFn=moveIntf ):
+         debug( 'added intf %s (%d) to node %s\n' % (
+                 intf, port, self.name ) )
+         if self.inNamespace:
+-            debug( 'moving', intf, 'into namespace for', self.name, '\n' )
+-            moveIntfFn( intf.name, self  )
++            if hasattr( intf, 'delayedMove' ) and intf.delayedMove is True:
++                pass
++            else:
++                debug( 'moving', intf, 'into namespace for', self.name, '\n' )
++                moveIntfFn( intf.name, self  )
+ 
+     def defaultIntf( self ):
+         "Return interface for lowest port"

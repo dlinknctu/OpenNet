@@ -10,7 +10,7 @@ set -e
 
 ROOT_PATH=`pwd`
 OVS_VERSION='2.3.1'
-MININET_VERSION='2.2.0'
+MININET_VERSION='2.2.1'
 NS3_VERSION='3.22'
 PYGCCXML_VERSION='1.0.0'
 NETANIM_VERSION='3.105'
@@ -170,14 +170,16 @@ function opennet {
 
     echo "Install OpenNet"
     cd $ROOT_PATH
-    cp mininet-patch/mininet/ns3.py mininet/mininet/
-    cp mininet-patch/mininet/node.py mininet/mininet/
-    cp mininet-patch/examples/wifiroaming.py mininet/examples/
+    echo "Patch Mininet"
+    cp $ROOT_PATH/mininet-patch/mininet/* $ROOT_PATH/mininet/mininet/
+    cp $ROOT_PATH/mininet-patch/examples/* $ROOT_PATH/mininet/examples/
+    cd $ROOT_PATH/mininet/mininet
+    patch -p2 < node.patch
 
     #rebuild mininet
     $ROOT_PATH/mininet/util/install.sh -n
 
-    #patch
+    echo "Patch NS3"
     cp $ROOT_PATH/ns3-patch/*.patch $ROOT_PATH/ns-allinone-$NS3_VERSION/ns-$NS3_VERSION
     cd $ROOT_PATH/ns-allinone-$NS3_VERSION/ns-$NS3_VERSION
     patch -p1 < animation-interface.patch
