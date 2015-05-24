@@ -15,7 +15,23 @@ http://www.slideshare.net/rascov/20140824-open-net
 With this VM image, please following the instruction in the "Run OpenNet" section to start the simulation.  
 OpenNet and corresponding tools can be found under "/home/nctuopennet/workspace".  
 
-## Build OpenNet on your own - Use install.sh
+The following commands can build the NetAnim in this VM.  
+Install packages:
+<pre>
+Ubuntu:
+$ apt-get install qt4-dev-tools
+Fedora:
+$ sudo yum install mercurial qt4 qt4-devel qt-devel qt-config
+</pre>
+Build the NetAnim:
+<pre>
+$ cd /home/nctuopennet/workspace/ns-allinone-3.21/netanim-3.105.
+$ qmake-qt4 NetAnim.pro (or qmake NetAnim.pro)
+$ make
+$ ./NetAnim
+</pre>
+
+## (RECOMMENDED)Build OpenNet on your own - Use install.sh
 
 <pre>
 ./install.sh -a
