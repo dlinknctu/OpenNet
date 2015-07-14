@@ -208,11 +208,20 @@ function netanim {
 function finish {
 
     echo " OpenNet installation complete."
-    echo " Please try following commands to run the simulation/"
-    echo " \$ cd $ROOT_PATH/ns-allinone-$NS3_VERSION/ns-$NS3_VERSION/"
-    echo " \$ ./waf shell"
+    echo " Please try following commands to run the simulation"
+    echo " \$ ./waf_shell.sh"
     echo " \$ cd $ROOT_PATH/mininet/examples"
     echo " \$ python wifiroaming.py"
+
+}
+
+function waf {
+
+    WAF_SHELL=$ROOT_PATH/waf_shell.sh
+    echo "#!/bin/sh" > $WAF_SHELL
+    echo "cd $ROOT_PATH/ns-allinone-$NS3_VERSION/ns-$NS3_VERSION/" >> $WAF_SHELL
+    echo "./waf shell" >> $WAF_SHELL
+    chmod +x $WAF_SHELL
 
 }
 
@@ -227,6 +236,7 @@ function all {
     mininet
     openvswitch
     opennet
+    waf
     finish
 
 }
@@ -244,7 +254,7 @@ function usage {
 }
 
 
-PARA='amdhenipgosf'
+PARA='amdhenipgoswf'
 if [ $# -eq 0 ]
 then
     usage
@@ -263,6 +273,7 @@ else
         g)  gccxml;;
         o)  opennet;;
         s)  openvswitch;;
+        w)  waf;;
         f)  finish;;
         esac
     done
