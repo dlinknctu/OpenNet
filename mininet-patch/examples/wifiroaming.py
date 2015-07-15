@@ -85,16 +85,6 @@ csmalinks = [ {'nodename1': 's1', 'nodename2': 's2'},
               {'nodename1': 's1', 'nodename2': 's7'},
            ]
 
-"""
-getWifiNode will return the wifinode with specific name.
-"""
-
-def getWifiNode( wifinode, name ):
-    for n in wifinode:
-        if n.name == name:
-            return n
-    return None
-
 def WifiNet():
 
     """ Create an Wifi network and add nodes to it. """

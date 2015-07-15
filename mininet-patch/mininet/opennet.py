@@ -84,4 +84,16 @@ class Pcap( object ):
 
         return True
 
+"""
+getWifiNode will return the wifinode with specific name.
+"""
+
+def getWifiNode( wifinode, name):
+    for n in wifinode:
+        if n.name == name:
+            return n
+    return None
+
+def addCSMALink(node1, node2, datarate="100Mbps"):
+    CSMALink(node1, node2, datarate)
 
