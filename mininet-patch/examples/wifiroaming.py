@@ -1,4 +1,4 @@
-#i!/usr/bin/python
+#!/usr/bin/python
 
 """
 This example shows how to create an empty Mininet object
@@ -83,7 +83,6 @@ csmalinks = [ {'nodename1': 's1', 'nodename2': 's2'},
               {'nodename1': 's1', 'nodename2': 's5'},
               {'nodename1': 's1', 'nodename2': 's6'},
               {'nodename1': 's1', 'nodename2': 's7'},
-              {'nodename1': 's1', 'nodename2': 's8'},
            ]
 
 """
@@ -103,7 +102,7 @@ def WifiNet():
     net = Mininet()
 
     info( '*** Adding controller\n' )
-    net.addController( 'c0', controller=RemoteController, ip='140.113.215.6', port=6633 )
+    net.addController( 'c0', controller=RemoteController, ip='127.0.0.1', port=6633 )
 
     """ Initialize the WifiSegment, please refer ns3.py """
     wifi = WifiSegment(standard = ns.wifi.WIFI_PHY_STANDARD_80211g)
@@ -181,17 +180,14 @@ def WifiNet():
             continue
         CSMALink( clnode1, clnode2, DataRate="100Mbps")
 
-    """ Create /tmp/pcap if it does not exist """
-    rv = os.path.isdir("/tmp/pcap")
-    if rv is False:
-        os.mkdir("/tmp/pcap")
-
-    """ Enable Pcap output """
-    ns.wifi.YansWifiPhyHelper().Default().EnablePcapAll("/tmp/pcap/wifi")
-    ns.csma.CsmaHelper().EnablePcapAll("/tmp/pcap/csma")
+    """ Enable Pcap output"""
+    pcap = Pcap()
+    pcap.enable()
+    print pcap
 
     """ Enable netanim output"""
-    anim = netanim("/tmp/xml/wifi-wired-bridged4.xml", nodes)
+    anim = Netanim("/tmp/xml/wifi-wired-bridged4.xml", nodes)
+    print anim
 
     """ Update node descriptions in the netanim """
     for n in nodes:
