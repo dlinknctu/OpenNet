@@ -1,0 +1,10 @@
+diff --git a/examples/cluster.py b/examples/cluster.py
+index d7a4203..21dc416 100755
+--- a/examples/cluster.py
++++ b/examples/cluster.py
+@@ -103,7 +103,7 @@ def findUser():
+             # Logged-in user (if we have a tty)
+             ( quietRun( 'who am i' ).split() or [ False ] )[ 0 ] or
+             # Give up and return effective user
+-            quietRun( 'whoami' ) )
++            quietRun( 'whoami' ).strip() )
