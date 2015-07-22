@@ -14,17 +14,13 @@ if __name__ == '__main__':
     net = Mininet()
 
     info( '*** Creating Network\n' )
-    h0 = Node( 'h0' )
-    h1 = Node( 'h1' )
-
-    net.hosts.append( h0 )
-    net.hosts.append( h1 )
-
+    h0 = net.addHost( 'h0' )
+    h1 = net.addHost( 'h1' )
     wifi = WIFISegment()
 
     wifi.add( h0 )
     wifi.add( h1 )
-    
+
 
 
     info( '*** Configuring hosts\n' )
@@ -64,5 +60,5 @@ if __name__ == '__main__':
     info( 'Testing bandwidth between h0 and h1 while 100 meters away\n' )
     net.iperf( ( h0, h1 ) )
 
-    
+
 

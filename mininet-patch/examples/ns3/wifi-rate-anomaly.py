@@ -17,13 +17,9 @@ if __name__ == '__main__':
     net = Mininet()
 
     info( '*** Creating Network\n' )
-    h0 = Node( 'h0' )
-    h1 = Node( 'h1' )
-    h2 = Node( 'h2' )
-
-    net.hosts.append( h0 )
-    net.hosts.append( h1 )
-    net.hosts.append( h2 )
+    h0 = net.addHost( 'h0' )
+    h1 = net.addHost( 'h1' )
+    h2 = net.addHost( 'h2' )
 
     wifi = WIFISegment()
 
@@ -35,7 +31,7 @@ if __name__ == '__main__':
                                              "DataMode", ns.core.StringValue( "OfdmRate54Mbps" ) )
     wifi.add( h0 )
 
-    # set datarate for node h1   
+    # set datarate for node h1
     wifi.wifihelper.SetRemoteStationManager( "ns3::ConstantRateWifiManager",
                                              "DataMode", ns.core.StringValue( "OfdmRate6Mbps" ) )
     wifi.add( h1 )
@@ -44,7 +40,7 @@ if __name__ == '__main__':
     wifi.wifihelper.SetRemoteStationManager( "ns3::ConstantRateWifiManager",
                                              "DataMode", ns.core.StringValue( "OfdmRate54Mbps" ) )
     wifi.add( h2 )
-    
+
 
 
     info( '*** Configuring hosts\n' )

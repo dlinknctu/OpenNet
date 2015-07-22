@@ -19,11 +19,11 @@ def emptyNet():
     "Create an empty network and add nodes to it."
     "[h1]<---network-a--->[s3]<--wifi-bridge-->[s4]<---network-b--->[h2]"
 
-    net = Mininet( controller=OVSController )
+    net = Mininet()
 
     info( '*** Adding controllers\n' )
-    net.addController( 'c0' )
-    net.addController( 'c1' )
+    net.addController( 'c0', controller=RemoteController, ip=127.0.0.1, port=6633 )
+    net.addController( 'c1', controller=RemoteController, ip=127.0.0.2, port=6633 )
 
     info( '*** Adding hosts\n' )
     h1 = net.addHost( 'h1', ip='10.0.0.1' )

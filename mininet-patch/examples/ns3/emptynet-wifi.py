@@ -6,7 +6,7 @@ This example shows how to create an empty Mininet object
 """
 
 from mininet.net import Mininet
-from mininet.node import OVSController
+from mininet.node import RemoteController
 from mininet.cli import CLI
 from mininet.log import setLogLevel, info
 
@@ -20,10 +20,10 @@ def emptyNet():
     "   ^                      ^  ^                      ^   "
     "  Sta                    Ap  Ap                    Sta  "
 
-    net = Mininet( controller=OVSController )
+    net = Mininet()
 
     info( '*** Adding controller\n' )
-    net.addController( 'c0' )
+    net.addController( 'c0', controller=RemoteController, ip="127.0.0.1", port=6633 )
 
     info( '*** Adding hosts\n' )
     h1 = net.addHost( 'h1', ip='10.0.0.1' )

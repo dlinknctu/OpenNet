@@ -14,11 +14,8 @@ if __name__ == '__main__':
     net = Mininet()
 
     info( '*** Creating Network\n' )
-    h0 = Node( 'h0' )
-    h1 = Node( 'h1' )
-
-    net.hosts.append( h0 )
-    net.hosts.append( h1 )
+    h0 = net.addHost( 'h0' )
+    h1 = net.addHost( 'h1' )
 
     link = CSMALink( h0, h1 )
 

@@ -16,13 +16,9 @@ if __name__ == '__main__':
     net = Mininet()
 
     info( '*** Creating Network\n' )
-    h0 = Node( 'h0' )
-    h1 = Node( 'h1' )
-    h2 = Node( 'h2' )
-
-    net.hosts.append( h0 )
-    net.hosts.append( h1 )
-    net.hosts.append( h2 )
+    h0 = net.addHost( 'h0' )
+    h1 = net.addHost( 'h1' )
+    h2 = net.addHost( 'h2' )
 
 #   NS part ------------------------------------------------------
 
@@ -45,7 +41,7 @@ if __name__ == '__main__':
 
 #   NS part END --------------------------------------------------
 
- 
+
 
     tb0 = TBIntf(name="tap0", node=h0, port=None, nsNode=h0ns, nsDevice=device0)
 
@@ -72,5 +68,5 @@ if __name__ == '__main__':
     h0.cmdPrint( 'ping -c1 ' + h1.IP() )
     h0.cmdPrint( 'ping -c1 ' + h2.IP() )
 
-    
+
 
