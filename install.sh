@@ -172,7 +172,7 @@ function opennet {
     cd $ROOT_PATH
     echo "Patch Mininet"
     cp $ROOT_PATH/mininet-patch/mininet/* $ROOT_PATH/mininet/mininet/
-    cp $ROOT_PATH/mininet-patch/examples/* $ROOT_PATH/mininet/examples/
+    cp -R $ROOT_PATH/mininet-patch/examples/* $ROOT_PATH/mininet/examples/
     cd $ROOT_PATH/mininet/mininet
     patch -p2 < node.patch
 
@@ -210,7 +210,7 @@ function finish {
     echo " OpenNet installation complete."
     echo " Please try following commands to run the simulation"
     echo " \$ ./waf_shell.sh"
-    echo " \$ cd $ROOT_PATH/mininet/examples"
+    echo " \$ cd $ROOT_PATH/mininet/examples/opennet"
     echo " \$ python wifiroaming.py"
 
 }
