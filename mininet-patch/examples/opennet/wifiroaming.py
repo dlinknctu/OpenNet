@@ -112,10 +112,8 @@ def WifiNet():
         """ Assign the addfunc, please refer Mininet for more details about addHost and addSwitch """
         if nodetype is 'host':
             addfunc = net.addHost
-            color = (255, 0, 0)
         elif nodetype is 'switch':
             addfunc = net.addSwitch
-            color = (0, 0, 255)
         else:
             addfunc = None
         if nodename is None or addfunc is None:
@@ -180,8 +178,12 @@ def WifiNet():
     print anim
 
     """ Update node descriptions in the netanim """
-    for n in nodes:
-        anim.UpdateNodeDescription (node.nsNode, nodename+'-'+str(node.nsNode.GetId()))
+    for node in wifinodes:
+        anim.UpdateNodeDescription (node.nsNode, str(node) + '-' + str(node.nsNode.GetId()))
+        if isinstance(node, mininet.node.OVSSwitch):
+            color = (0, 255, 0)
+        elif isinstance(node, mininet.node.Host):
+            color = (0, 0, 255)
         anim.UpdateNodeColor (node.nsNode, color[0], color[1], color[2])
 
     """ Start the simulation """
