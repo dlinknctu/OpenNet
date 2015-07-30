@@ -13,6 +13,22 @@ index 544fae3..c864719 100644
 +            else:
 +                debug( 'moving', intf, 'into namespace for', self.name, '\n' )
 +                moveIntfFn( intf.name, self  )
- 
+
      def defaultIntf( self ):
          "Return interface for lowest port"
+
+diff --git a/mininet/node.py b/mininet/node.py
+index c864719..641c9f9 100644
+--- a/mininet/node.py
++++ b/mininet/node.py
+@@ -1524,3 +1524,6 @@ def DefaultController( name, controllers=DefaultControllers, **kwargs ):
+ def NullController( *_args, **_kwargs ):
+     "Nonexistent controller - simply returns None"
+     return None
++
++class AP ( OVSSwitch ):
++    pass
++
++class Station ( Host ):
++    pass
++

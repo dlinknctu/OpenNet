@@ -27,16 +27,24 @@ def main():
     wifi = WifiSegment()
 
     # About AP
-    ap0 = net.addSwitch('ap0')
+    ap0 = net.addAP('ap0')
     mininet.ns3.setMobilityModel(ap0, None)
     mininet.ns3.setPosition(ap0, 0, 0, 0)
     wifi.addAp(ap0, channelNumber=6, ssid="opennet_ap")
 
+    # Check mininet.node.AP
+    if isinstance(ap0, mininet.node.AP):
+        print("I'm a AP")
+
     # About Station
-    sta0 = net.addHost('sta0')
+    sta0 = net.addStation('sta0')
     mininet.ns3.setMobilityModel(sta0, None)
     mininet.ns3.setPosition(sta0, 0, 0, 0)
     wifi.addSta(sta0, channelNumber=6, ssid="opennet_ap")
+
+    #Check mininet.node.Station
+    if isinstance(sta0, mininet.node.Station):
+        print("I'm a station")
 
     print("APs list: {0}\nSTAs list: {1}\n".format(wifi.aps, wifi.stas))
 

@@ -175,6 +175,7 @@ function opennet {
     cp -R $ROOT_PATH/mininet-patch/examples/* $ROOT_PATH/mininet/examples/
     cd $ROOT_PATH/mininet/mininet
     patch -p2 < node.patch
+    patch -p2 < net.patch
     cd $ROOT_PATH/mininet/examples
     patch -p2 < whoami.patch
 
