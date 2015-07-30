@@ -209,7 +209,10 @@ function netanim {
 
 function finish {
 
+    echo "======================================================================="
     echo " OpenNet installation complete."
+    echo " Before using OpenNet, you need to prepare SDN controller by yourself."
+    echo "======================================================================="
     echo " Please try following commands to run the simulation"
     echo " \$ ./waf_shell.sh"
     echo " \$ cd $ROOT_PATH/mininet/examples/opennet"
