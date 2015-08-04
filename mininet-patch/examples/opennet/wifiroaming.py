@@ -74,16 +74,16 @@ wifiintfs = [ {'nodename': 'h1', 'type': 'sta', 'channel': 1, 'ssid': 'ssid'},
            ]
 
 """
-camalinks is a list of Ethernet links.
+links is a list of Ethernet links.
 """
 
-csmalinks = [ {'nodename1': 's1', 'nodename2': 's2'},
-              {'nodename1': 's1', 'nodename2': 's3'},
-              {'nodename1': 's1', 'nodename2': 's4'},
-              {'nodename1': 's1', 'nodename2': 's5'},
-              {'nodename1': 's1', 'nodename2': 's6'},
-              {'nodename1': 's1', 'nodename2': 's7'},
-           ]
+links = [ {'nodename1': 's1', 'nodename2': 's2'},
+          {'nodename1': 's1', 'nodename2': 's3'},
+          {'nodename1': 's1', 'nodename2': 's4'},
+          {'nodename1': 's1', 'nodename2': 's5'},
+          {'nodename1': 's1', 'nodename2': 's6'},
+          {'nodename1': 's1', 'nodename2': 's7'},
+       ]
 
 def WifiNet():
 
@@ -157,7 +157,7 @@ def WifiNet():
         tb = addfunc (node, wichannel, wissid)
 
     """ Initialize Ehternet links between switches """
-    for cl in csmalinks:
+    for cl in links:
         clnodename1 = cl.get('nodename1', None)
         clnodename2 = cl.get('nodename2', None)
         if clnodename1 is None or clnodename2 is None:
@@ -166,7 +166,7 @@ def WifiNet():
         clnode2 = getWifiNode (wifinodes, clnodename2)
         if clnode1 is None or clnode2 is None:
             continue
-        CSMALink( clnode1, clnode2, DataRate="100Mbps")
+        net.addLink( clnode1, clnode2 )
 
     """ Enable Pcap output"""
     pcap = Pcap()
