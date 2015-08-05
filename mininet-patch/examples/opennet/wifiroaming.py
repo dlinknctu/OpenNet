@@ -140,7 +140,6 @@ def WifiNet():
         witype = wi.get('type', None)
         wichannel = wi.get('channel', None)
         wissid = wi.get('ssid', None)
-        wiip = wi.get('ip', None)
 
         """ Assign the addfunc, please refer the WifiSegment in ns3.py """
         if witype is 'sta':
