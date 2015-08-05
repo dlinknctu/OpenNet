@@ -153,7 +153,7 @@ def WifiNet():
 
         """ Get wifi node and add it to the TapBridge """
         node = getWifiNode (wifinodes, winodename)
-        tb = addfunc (node, wichannel, wissid)
+        addfunc (node, wichannel, wissid)
 
     """ Initialize Ehternet links between switches """
     for cl in links:
