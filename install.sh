@@ -51,51 +51,32 @@ function detect_os {
 
 }
 
-function mininet {
+function enviroment {
 
-    echo "Fetch Mininet"
-    cd $ROOT_PATH
-    if [ ! -d mininet ]; then
-        git clone https://github.com/mininet/mininet.git
+    echo "Prepare Enviroment"
+    if [ "$DIST" = "Fedora" ] || [ "$DIST" = "CentOS" ]; then
+        $install make git vim openssh openssh-server unzip curl gcc wget \
+        gcc-c++ python python-devel cmake glibc-devel.i686 glibc-devel.x86_64 net-tools \
+        make python-devel openssl-devel kernel-devel graphviz kernel-debug-devel \
+        autoconf automake rpm-build redhat-rpm-config libtool \
+        mercurial qt4 qt4-devel qt-devel qt-config
+
+        SELINUX_STATUS="$(grep SELINUX=disabled /etc/selinux/config)"
+        if [ $? -eq 1 ]; then
+            sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
+            setenforce 0
+        fi
+        systemctl stop firewalld.service
+        systemctl disable firewalld.service
     fi
-
-    cd $ROOT_PATH/mininet && git checkout tags/$MININET_VERSION
-    cp $ROOT_PATH/mininet-patch/util/install.sh $ROOT_PATH/mininet/util/
-    ./util/install.sh -fn
-
-}
-
-function openvswitch {
-
-    cd $ROOT_PATH
-    if [ "$DIST" = "Ubuntu" ]; then
-        wget http://openvswitch.org/releases/openvswitch-$OVS_VERSION.tar.gz
-        tar zxvf openvswitch-$OVS_VERSION.tar.gz && cd openvswitch-$OVS_VERSION
-        #TODO Need to integrate *deb
-        DEB_BUILD_OPTIONS='parallel=2 nocheck' fakeroot debian/rules binary
-        dpkg -i $ROOT_PATH/openvswitch-switch_$OVS_VERSION*.deb $ROOT_PATH/openvswitch-common_$OVS_VERSION*.deb \
-                $ROOT_PATH/openvswitch-pki_$OVS_VERSION*.deb
+    if [ "$DIST" = "Ubuntu" ] ; then
+        $install gcc g++ python python-dev make cmake gcc-4.8-multilib g++-4.8-multilib \
+        python-setuptools unzip curl build-essential debhelper make autoconf automake \
+        patch dpkg-dev libssl-dev libncurses5-dev libpcre3-dev graphviz python-all \
+        python-qt4 python-zopeinterface python-twisted-conch uuid-runtime \
+        qt4-dev-tools
     fi
-
-    if [ "$DIST" = "CentOS" ] || [ "$DIST" = "Fedora" ]; then
-        mkdir -p $ROOT_PATH/rpmbuild/SOURCES/ && cd $ROOT_PATH/rpmbuild/SOURCES/
-        wget http://openvswitch.org/releases/openvswitch-$OVS_VERSION.tar.gz
-        tar zxvf openvswitch-$OVS_VERSION.tar.gz && cd openvswitch-$OVS_VERSION
-        rpmbuild -bb --define "_topdir $ROOT_PATH/rpmbuild" --without check rhel/openvswitch.spec
-        rpm -ivh --replacepkgs --replacefiles --nodeps $ROOT_PATH/rpmbuild/RPMS/x86_64/openvswitch*.rpm
-        /etc/init.d/openvswitch start
-    fi
-
-}
-
-function ns3 {
-
-    echo "Fetch ns-$NS3_VERSION"
-    cd $ROOT_PATH
-    if [ ! -f ns-allinone-$NS3_VERSION.tar.bz2 ]; then
-        curl -O -k https://www.nsnam.org/release/ns-allinone-$NS3_VERSION.tar.bz2
-    fi
-    tar xf ns-allinone-$NS3_VERSION.tar.bz2
+    wget https://bitbucket.org/pypa/setuptools/raw/bootstrap/ez_setup.py -O - | python
 
 }
 
@@ -137,32 +118,61 @@ function gccxml {
 
 }
 
-function enviroment {
+function ns3 {
 
-    echo "Prepare Enviroment"
-    if [ "$DIST" = "Fedora" ] || [ "$DIST" = "CentOS" ]; then
-        $install make git vim openssh openssh-server unzip curl gcc wget \
-        gcc-c++ python python-devel cmake glibc-devel.i686 glibc-devel.x86_64 net-tools \
-        make python-devel openssl-devel kernel-devel graphviz kernel-debug-devel \
-        autoconf automake rpm-build redhat-rpm-config libtool \
-        mercurial qt4 qt4-devel qt-devel qt-config
+    echo "Fetch ns-$NS3_VERSION"
+    cd $ROOT_PATH
+    if [ ! -f ns-allinone-$NS3_VERSION.tar.bz2 ]; then
+        curl -O -k https://www.nsnam.org/release/ns-allinone-$NS3_VERSION.tar.bz2
+    fi
+    tar xf ns-allinone-$NS3_VERSION.tar.bz2
 
-        SELINUX_STATUS="$(grep SELINUX=disabled /etc/selinux/config)"
-        if [ $? -eq 1 ]; then
-            sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
-            setenforce 0
-        fi
-        systemctl stop firewalld.service
-        systemctl disable firewalld.service
+}
+
+function netanim {
+
+    echo "Build NetAnim"
+    cd $ROOT_PATH/ns-allinone-$NS3_VERSION/netanim-$NETANIM_VERSION
+    qmake-qt4 NetAnim.pro
+    make
+}
+
+function mininet {
+
+    echo "Fetch dlinknctu/mininet"
+    echo "Base on Mininet $MININET_VERSION"
+    echo "Default branch: opennet"
+    cd $ROOT_PATH
+    if [ ! -d mininet ]; then
+        git clone --branch opennet https://github.com/dlinknctu/mininet.git
     fi
-    if [ "$DIST" = "Ubuntu" ] ; then
-        $install gcc g++ python python-dev make cmake gcc-4.8-multilib g++-4.8-multilib \
-        python-setuptools unzip curl build-essential debhelper make autoconf automake \
-        patch dpkg-dev libssl-dev libncurses5-dev libpcre3-dev graphviz python-all \
-        python-qt4 python-zopeinterface python-twisted-conch uuid-runtime \
-        qt4-dev-tools
+
+    echo "Install mininet"
+    cd $ROOT_PATH/mininet/
+    ./util/install.sh -n
+
+}
+
+function openvswitch {
+
+    cd $ROOT_PATH
+    if [ "$DIST" = "Ubuntu" ]; then
+        wget http://openvswitch.org/releases/openvswitch-$OVS_VERSION.tar.gz
+        tar zxvf openvswitch-$OVS_VERSION.tar.gz && cd openvswitch-$OVS_VERSION
+        #TODO Need to integrate *deb
+        DEB_BUILD_OPTIONS='parallel=2 nocheck' fakeroot debian/rules binary
+        dpkg -i $ROOT_PATH/openvswitch-switch_$OVS_VERSION*.deb $ROOT_PATH/openvswitch-common_$OVS_VERSION*.deb \
+                $ROOT_PATH/openvswitch-pki_$OVS_VERSION*.deb
     fi
-    wget https://bitbucket.org/pypa/setuptools/raw/bootstrap/ez_setup.py -O - | python
+
+    if [ "$DIST" = "CentOS" ] || [ "$DIST" = "Fedora" ]; then
+        mkdir -p $ROOT_PATH/rpmbuild/SOURCES/ && cd $ROOT_PATH/rpmbuild/SOURCES/
+        wget http://openvswitch.org/releases/openvswitch-$OVS_VERSION.tar.gz
+        tar zxvf openvswitch-$OVS_VERSION.tar.gz && cd openvswitch-$OVS_VERSION
+        rpmbuild -bb --define "_topdir $ROOT_PATH/rpmbuild" --without check rhel/openvswitch.spec
+        rpm -ivh --replacepkgs --replacefiles --nodeps $ROOT_PATH/rpmbuild/RPMS/x86_64/openvswitch*.rpm
+        /etc/init.d/openvswitch start
+    fi
 
 }
 
@@ -170,20 +180,13 @@ function opennet {
 
     echo "Install OpenNet"
     cd $ROOT_PATH
-    echo "Patch Mininet"
-    cp $ROOT_PATH/mininet-patch/mininet/* $ROOT_PATH/mininet/mininet/
+    echo "Copy files to Mininet directory"
     cp -R $ROOT_PATH/mininet-patch/examples/* $ROOT_PATH/mininet/examples/
-    cp -R $ROOT_PATH/mininet-patch/util/* $ROOT_PATH/mininet/util/
-    cd $ROOT_PATH/mininet/mininet
-    patch -p2 < node.patch
-    patch -p2 < net.patch
-    cd $ROOT_PATH/mininet/examples
-    patch -p2 < whoami.patch
-    cd $ROOT_PATH/mininet/util
-    patch -p2 < clustersetup.patch
+    cp -R $ROOT_PATH/mininet-patch/mininet/* $ROOT_PATH/mininet/mininet/
 
-    #rebuild mininet
-    $ROOT_PATH/mininet/util/install.sh -n
+    echo "Re-build mininet"
+    cd $ROOT_PATH/mininet/
+    ./util/install.sh -n
 
     echo "Patch NS3"
     cp $ROOT_PATH/ns3-patch/*.patch $ROOT_PATH/ns-allinone-$NS3_VERSION/ns-$NS3_VERSION
@@ -203,12 +206,15 @@ function opennet {
 
 }
 
-function netanim {
 
-    echo "Build NetAnim"
-    cd $ROOT_PATH/ns-allinone-$NS3_VERSION/netanim-$NETANIM_VERSION
-    qmake-qt4 NetAnim.pro
-    make
+function waf {
+
+    WAF_SHELL=$ROOT_PATH/waf_shell.sh
+    echo "#!/bin/sh" > $WAF_SHELL
+    echo "cd $ROOT_PATH/ns-allinone-$NS3_VERSION/ns-$NS3_VERSION/" >> $WAF_SHELL
+    echo "./waf shell" >> $WAF_SHELL
+    chmod +x $WAF_SHELL
+
 }
 
 function finish {
@@ -221,16 +227,6 @@ function finish {
     echo " \$ ./waf_shell.sh"
     echo " \$ cd $ROOT_PATH/mininet/examples/opennet"
     echo " \$ python wifiroaming.py"
-
-}
-
-function waf {
-
-    WAF_SHELL=$ROOT_PATH/waf_shell.sh
-    echo "#!/bin/sh" > $WAF_SHELL
-    echo "cd $ROOT_PATH/ns-allinone-$NS3_VERSION/ns-$NS3_VERSION/" >> $WAF_SHELL
-    echo "./waf shell" >> $WAF_SHELL
-    chmod +x $WAF_SHELL
 
 }
 
@@ -249,7 +245,6 @@ function all {
     finish
 
 }
-
 
 function usage {
 
@@ -272,16 +267,16 @@ else
     do
         case $OPTION in
         a)  all;;
-        m)  mininet;;
-        d)  detect_os;;
         h)  usage;;
+        d)  detect_os;;
         e)  enviroment;;
-        n)  ns3;;
-        i)  netanim;;
         p)  pygccxml;;
         g)  gccxml;;
-        o)  opennet;;
+        n)  ns3;;
+        i)  netanim;;
+        m)  mininet;;
         s)  openvswitch;;
+        o)  opennet;;
         w)  waf;;
         f)  finish;;
         esac
