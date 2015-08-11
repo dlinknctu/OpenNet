@@ -20,18 +20,29 @@ Testing enviroment (cat /etc/hosts) :
 192.168.59.101 mininet2
 """
 
-from mininet.examples.cluster import MininetCluster
+# from mininet.examples.cluster import MininetCluster
 from mininet.log import setLogLevel
-from mininet.examples.clustercli import ClusterCLI as CLI
 from mininet.node import Controller, RemoteController
 from mininet.link import Link, Intf
 from mininet.util import quietRun, errRun
+
+from mininet.cluster.node import *
+from mininet.cluster.net import *
+from mininet.cluster.placer import *
+from mininet.cluster.link import *
+from mininet.cluster.cleanup import *
+from mininet.cluster.cli import ClusterCLI as CLI
+
 
 def demo():
     CONTROLLER_IP="192.168.59.100"
     CONTROLLER_PORT=6633
     servers = [ 'mininet1', 'mininet2' ]
-    net = MininetCluster( controller=RemoteController, servers=servers)
+
+    # Tunneling options: ssh
+    net = MininetCluster( controller=RemoteController, servers=servers, tunneling="ssh")
+    # net = MininetCluster( controller=RemoteController, servers=servers)
+
     c0 = net.addController( 'c0', controller=RemoteController, ip=CONTROLLER_IP, port=CONTROLLER_PORT)
 
     # In mininet1

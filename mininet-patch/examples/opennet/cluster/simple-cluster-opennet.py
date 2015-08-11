@@ -20,12 +20,17 @@ Testing enviroment (cat /etc/hosts) :
 192.168.59.101 mininet2
 """
 
-from mininet.examples.cluster import MininetCluster
 from mininet.log import setLogLevel
-from mininet.examples.clustercli import ClusterCLI as CLI
 from mininet.node import Controller, RemoteController
 from mininet.link import Link, Intf
 from mininet.util import quietRun, errRun
+
+from mininet.cluster.node import *
+from mininet.cluster.net import *
+from mininet.cluster.placer import *
+from mininet.cluster.link import *
+from mininet.cluster.cleanup import *
+from mininet.cluster.cli import ClusterCLI as CLI
 
 import mininet.ns3
 from mininet.ns3 import WifiSegment
