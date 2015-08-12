@@ -39,8 +39,8 @@ def demo():
     CONTROLLER_PORT=6633
     servers = [ 'mininet1', 'mininet2' ]
 
-    # Tunneling options: ssh
-    net = MininetCluster( controller=RemoteController, servers=servers, tunneling="ssh")
+    # Tunneling options: ssh (default), vxlan, gre
+    net = MininetCluster( controller=RemoteController, servers=servers, tunneling="vxlan")
     # net = MininetCluster( controller=RemoteController, servers=servers)
 
     c0 = net.addController( 'c0', controller=RemoteController, ip=CONTROLLER_IP, port=CONTROLLER_PORT)
