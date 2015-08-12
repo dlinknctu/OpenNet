@@ -30,7 +30,7 @@ from mininet.cluster.node import *
 from mininet.cluster.net import *
 from mininet.cluster.placer import *
 from mininet.cluster.link import *
-from mininet.cluster.cleanup import *
+from mininet.cluster.clean import *
 from mininet.cluster.cli import ClusterCLI as CLI
 
 
