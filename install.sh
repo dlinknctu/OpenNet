@@ -59,7 +59,7 @@ function enviroment {
         gcc-c++ python python-devel cmake glibc-devel.i686 glibc-devel.x86_64 net-tools \
         make python-devel openssl-devel kernel-devel graphviz kernel-debug-devel \
         autoconf automake rpm-build redhat-rpm-config libtool \
-        mercurial qt4 qt4-devel qt-devel qt-config
+        mercurial qt4 qt4-devel qt-devel qt-config python-networkx
 
         SELINUX_STATUS="$(grep SELINUX=disabled /etc/selinux/config)"
         if [ $? -eq 1 ]; then
@@ -74,7 +74,7 @@ function enviroment {
         python-setuptools unzip curl build-essential debhelper make autoconf automake \
         patch dpkg-dev libssl-dev libncurses5-dev libpcre3-dev graphviz python-all \
         python-qt4 python-zopeinterface python-twisted-conch uuid-runtime \
-        qt4-dev-tools
+        qt4-dev-tools python-networkx
     fi
     wget https://bitbucket.org/pypa/setuptools/raw/bootstrap/ez_setup.py -O - | python
 
