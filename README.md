@@ -13,7 +13,9 @@ Build OpenNet on your own - Use install.sh
 ------------------------------------------
 Support Ubuntu 14.04.1  
 
+    $ git clone https://github.com/dlinknctu/OpenNet.git
     $ sudo ./install.sh -a
+    After a successful installation, the script will show "OpenNet installation complete."
 
 Run OpenNet
 -----------

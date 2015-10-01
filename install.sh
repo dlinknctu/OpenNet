@@ -70,8 +70,8 @@ function enviroment {
         systemctl disable firewalld.service
     fi
     if [ "$DIST" = "Ubuntu" ] ; then
-        $install gcc g++ python python-dev make cmake gcc-4.8-multilib g++-4.8-multilib \
-        python-setuptools unzip curl build-essential debhelper make autoconf automake \
+        $install gcc g++ python python-dev git vim make cmake gcc-4.8-multilib g++-4.8-multilib \
+        python-setuptools unzip curl build-essential debhelper autoconf automake \
         patch dpkg-dev libssl-dev libncurses5-dev libpcre3-dev graphviz python-all \
         python-qt4 python-zopeinterface python-twisted-conch uuid-runtime \
         qt4-dev-tools python-networkx
