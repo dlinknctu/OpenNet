@@ -1,0 +1,47 @@
+---
+- name: Replace APT source list
+  replace:
+    dest=/etc/apt/sources.list
+    regexp=us.archive.ubuntu.com
+    replace=ubuntu.cs.nctu.edu.tw
+    backup=yes
+  tags: apt
+- name: Update APT Cache
+  apt: update_cache=yes
+  tags: apt
+- name: Install required package
+  apt: name={{ item }} state=present
+  with_items:
+    - vim
+    - tmux
+    - git
+    - htop
+    - gcc
+    - g++
+    - python
+    - python-dev
+    - make
+    - cmake
+    - gcc-4.8-multilib
+    - g++-4.8-multilib
+    - python-setuptools
+    - unzip
+    - curl
+    - build-essential
+    - debhelper
+    - autoconf
+    - automake
+    - patch
+    - dpkg-dev
+    - libssl-dev
+    - libncurses5-dev
+    - libpcre3-dev
+    - graphviz
+    - python-all
+    - python-qt4
+    - python-zopeinterface
+    - python-twisted-conch
+    - uuid-runtime
+    - qt4-dev-tools
+    - python-networkx
+  tags: apt

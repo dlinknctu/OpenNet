@@ -1,0 +1,61 @@
+---
+- name: Set OpenvSwitch
+  set_fact:
+    ovs_url: "http://openvswitch.org/releases/openvswitch-{{ OVS_VERSION }}.tar.gz"
+  tags: openvswitch
+- name: Download OpenvSwitch
+  get_url:
+    url: "{{ ovs_url }}"
+    dest: "{{ temp_location }}"
+  tags: openvswitch
+- name: Untar OpenvSwitch
+  unarchive:
+    src: "{{ temp_location }}/openvswitch-{{ OVS_VERSION }}.tar.gz"
+    dest: "{{ temp_location }}"
+  tags: openvswitch
+- name: Build OpenvSwitch debian packages
+  command: "fakeroot debian/rules binary"
+  environment:
+    DEB_BUILD_OPTIONS: 'parallel=2 nocheck'
+  args:
+    chdir: "{{ temp_location }}/openvswitch-{{ OVS_VERSION }}"
+  tags: openvswitch
+- name: Install OpenvSwitch debian packages
+  command: "dpkg -i {{ item }}"
+  with_items:
+    - openvswitch-common_{{ OVS_VERSION }}-1_amd64.deb
+    - openvswitch-switch_{{ OVS_VERSION }}-1_amd64.deb
+    - openvswitch-pki_{{ OVS_VERSION }}-1_all.deb
+    - python-openvswitch_{{ OVS_VERSION }}-1_all.deb
+  args:
+    chdir: "{{ temp_location }}"
+  notify: Restart OpenvSwitch daemon
+  tags: openvswitch
+- name: Start OpenvSwitch Daemon
+  service: name=openvswitch-switch state=started enabled=yes
+  tags: openvswitch
+- name: Check OpenvSwitch Database Version
+  command: "ovs-vsctl --version"
+  register: ovsdb_version
+  tags: openvswitch
+- debug: msg="OpenvSwitch Database Version {{ ovsdb_version.stdout }}"
+  tags: openvswitch
+- name: Remove OpenvSwitch source code
+  file:
+    path: "{{ temp_location }}/{{ item }}"
+    state: absent
+  with_items:
+    - openvswitch-{{ OVS_VERSION }}
+    - openvswitch-{{ OVS_VERSION }}.tar.gz
+    - openvswitch-switch_{{ OVS_VERSION }}-1_amd64.deb
+    - openvswitch-common_{{ OVS_VERSION }}-1_amd64.deb
+    - openvswitch-datapath-dkms_{{ OVS_VERSION }}-1_all.deb
+    - openvswitch-datapath-source_{{ OVS_VERSION }}-1_all.deb
+    - openvswitch-dbg_{{ OVS_VERSION }}-1_amd64.deb
+    - openvswitch-ipsec_{{ OVS_VERSION }}-1_amd64.deb
+    - openvswitch-pki_{{ OVS_VERSION }}-1_all.deb
+    - openvswitch-test_{{ OVS_VERSION }}-1_all.deb
+    - openvswitch-testcontroller_{{ OVS_VERSION }}-1_amd64.deb
+    - openvswitch-vtep_{{ OVS_VERSION }}-1_amd64.deb
+    - python-openvswitch_{{ OVS_VERSION }}-1_all.deb
+  tags: openvswitch

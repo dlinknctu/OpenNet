@@ -1,0 +1,33 @@
+---
+- hosts: all
+  remote_user: root
+  any_errors_fatal: true
+  vars_files:
+    - group_vars/all
+  roles:
+    - apt
+    - ez_setup
+    - ntp
+    - openvswitch
+    - qperf
+
+- hosts: opennet-slave
+  remote_user: root
+  any_errors_fatal: true
+  vars_files:
+    - group_vars/all
+  roles:
+    - dlinknctu-mininet
+
+- hosts: opennet-master
+  remote_user: root
+  any_errors_fatal: true
+  vars_files:
+    - group_vars/all
+  roles:
+    - pygccxml
+    - gccxml
+    - ns3
+    - netanim
+    - dlinknctu-mininet
+    - help

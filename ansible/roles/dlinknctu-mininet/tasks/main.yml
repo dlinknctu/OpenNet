@@ -1,0 +1,36 @@
+- name: Set dlinknctu-mininet
+  set_fact:
+    mininet_repos: "https://github.com/dlinknctu/mininet.git"
+    mininet_dir_path: "{{ home_location }}/mininet"
+  tags: mininet
+- name: Clone dlinknctu-mininet
+  git:
+    repo: "{{ mininet_repos }}"
+    dest: "{{ mininet_dir_path }}"
+    update: no
+    accept_hostkey: true
+    version: "opennet"
+  tags: mininet
+- name: Add exmaples from OpenNet
+  copy:
+    src: "{{ home_location }}/mininet-patch/examples/"
+    dest: "{{ home_location }}/mininet/examples/"
+  tags: mininet
+- name: Add new module from OpenNet
+  copy:
+    src: "{{ home_location }}/mininet-patch/mininet/"
+    dest: "{{ home_location }}/mininet/mininet"
+  tags: mininet
+- name: Install dlinknctu-mininet
+  command: "./util/install.sh -n"
+  args:
+    chdir: "{{ home_location }}/mininet"
+  poll: 0
+  retries: 3
+  tags: mininet
+- name: Check mininet version
+  command: "mn --version"
+  register: mn_version
+  tags: mininet
+- debug: msg="Mininet Version {{ mn_version.stdout }}"
+  tags: mininet

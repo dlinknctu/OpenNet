@@ -1,0 +1,21 @@
+---
+- name: Be sure ntp daemon is installed
+  apt: name=ntp state=installed
+  tags: ntp
+- name: Change timezone Asia/Taipei
+  copy: src=/usr/share/zoneinfo/Asia/Taipei dest=/etc/localtime
+  tags: ntp
+# XXX: run_once is useless
+- name: Write to hardware
+  command: 'hwclock -w'
+  run_once: true
+  tags: ntp
+- name: Be sure ntp daemon is running and enabled
+  service: name=ntp state=running enabled=yes
+  tags: ntp
+- name: Check System Time
+  command: 'date'
+  register: time_result
+  tags: ntp
+- debug: msg="System time {{ time_result.stdout }}}"
+  tags: ntp

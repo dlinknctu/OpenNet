@@ -1,0 +1,61 @@
+---
+- name: Set NS3
+  set_fact:
+    ns3_url: "https://www.nsnam.org/release/ns-allinone-{{ NS3_VERSION }}.tar.bz2"
+  tags: ns3
+- name: Download NS3
+  get_url:
+    url: "{{ ns3_url }}"
+    dest: "{{ home_location }}"
+  tags: ns3
+- name: Untar NS3
+  unarchive:
+    src: "{{ home_location }}/ns-allinone-{{ NS3_VERSION }}.tar.bz2"
+    dest: "{{ home_location }}"
+  tags: ns3
+- name: Patch NS3
+  patch:
+    src: "{{ home_location }}/ns3-patch/{{ item }}"
+    basedir: "{{ home_location }}/ns-allinone-{{ NS3_VERSION }}/ns-{{ NS3_VERSION }}"
+    strip: 1
+  with_items:
+    - animation-interface.patch
+    - netanim-python.patch
+    - sta-wifi-scan.patch
+  tags: ns3
+- name: Waf configure
+  command: "./waf configure"
+  args:
+    chdir: "{{ home_location }}/ns-allinone-{{ NS3_VERSION }}/ns-{{ NS3_VERSION }}"
+  register: gg
+  tags: ns3
+- name: Waf apiscan
+  command: "./waf --apiscan={{ item }}"
+  with_items:
+    - netanim
+    - wifi
+  args:
+    chdir: "{{ home_location }}/ns-allinone-{{ NS3_VERSION }}/ns-{{ NS3_VERSION }}"
+  async: 0
+  poll: 0
+  ignore_errors: true
+  tags: ns3
+- name: Waf build
+  command: "./waf build"
+  args:
+    chdir: "{{ home_location }}/ns-allinone-{{ NS3_VERSION }}/ns-{{ NS3_VERSION }}"
+  async: 0
+  poll: 0
+  ignore_errors: true
+  tags: ns3
+- name: Create Waf Shell
+  template:
+    src: "waf_shell.sh.j2"
+    dest: "{{ home_location }}/waf_shell.sh"
+    mode: 0744
+  tags: ns3
+- name: Remove NS3 source code
+  file:
+    path: "{{ home_location }}/ns-allinone-{{ NS3_VERSION }}.tar.bz2"
+    state: absent
+  tags: ns3

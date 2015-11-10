@@ -3,7 +3,7 @@ openvswitch-*
 ns-allinone-*/*
 openflow/*
 mininet/*
-pygccxml*
+pygccxml/*
 gccxml/*
 .idea/*
 *.ropeproject*
@@ -11,4 +11,4 @@ gccxml/*
 *.zip
 *.deb
 waf_shell.sh
-
+opennet_help.txt

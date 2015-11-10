@@ -1,0 +1,5 @@
+[opennet-master]
+master ansible_ssh_user=root
+
+#[opennet-slave]
+#slave1 ansible_ssh_user=root

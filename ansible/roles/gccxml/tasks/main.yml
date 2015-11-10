@@ -1,0 +1,44 @@
+---
+- name: Set gccxml
+  set_fact:
+    gccxml_repos: "https://github.com/gccxml/gccxml.git"
+    gccxml_dir_path: "{{ temp_location }}/gccxml"
+  tags: gccxml
+- name: Clone gccxml
+  git:
+    repo: "{{ gccxml_repos }}"
+    dest: "{{ gccxml_dir_path }}"
+    update: no
+    accept_hostkey: true
+  tags: gccxml
+- name: Create gccxml-build directory
+  file:
+    path: "{{ gccxml_dir_path }}/gccxml-build"
+    state: directory
+  tags: gccxml
+- name: cmake gccxml
+  command: "cmake ../"
+  args:
+    chdir: "{{ gccxml_dir_path }}/gccxml-build"
+  tags: gccxml
+- name: make gccxml
+  command: "make"
+  args:
+    chdir: "{{ gccxml_dir_path }}/gccxml-build"
+  tags: gccxml
+- name: make install gccxml
+  command: "make install"
+  args:
+    chdir: "{{ gccxml_dir_path }}/gccxml-build"
+  tags: gccxml
+- name: Create gccxml link from /usr/local/bin/gccxml /bin/gccxml
+  file:
+    src: "/usr/local/bin/gccxml"
+    dest: "/bin/gccxml"
+    state: link
+  tags: gccxml
+- name: Remove gccxml source code
+  file:
+    path: "{{ gccxml_dir_path }}"
+    state: absent
+  tags: gccxml

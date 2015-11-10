@@ -1,0 +1,44 @@
+- name: Set qperf
+  set_fact:
+    qperf_url: "https://www.openfabrics.org/downloads/qperf/qperf-0.4.9.tar.gz"
+  tags: qperf
+- name: Download qperf
+  get_url:
+    url: "{{ qperf_url }}"
+    dest: "{{ temp_location }}"
+  tags: qperf
+- name: Untar qperf
+  unarchive:
+    src: "{{ temp_location }}/qperf-0.4.9.tar.gz"
+    dest: "{{ temp_location }}"
+  tags: qperf
+- name: Cleanup
+  command: "./cleanup"
+  args:
+    chdir: "{{ temp_location }}/qperf-0.4.9"
+  tags: qperf
+- name: Autogen
+  command: "./autogen.sh"
+  args:
+    chdir: "{{ temp_location }}/qperf-0.4.9"
+  tags: qperf
+- name: Configure
+  command: "./configure"
+  args:
+    chdir: "{{ temp_location }}/qperf-0.4.9"
+  tags: qperf
+- name: make
+  command: "make"
+  args:
+    chdir: "{{ temp_location }}/qperf-0.4.9"
+  tags: qperf
+- name: make install
+  command: "make install"
+  args:
+    chdir: "{{ temp_location }}/qperf-0.4.9"
+  tags: qperf
+- name: Remove qperf source code
+  file:
+    path: "{{ temp_location }}/qperf-0.4.9"
+    state: absent
+  tags: qperf

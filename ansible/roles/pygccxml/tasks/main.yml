@@ -1,0 +1,35 @@
+---
+- name: Set pygccxml
+  set_fact:
+    pygccxml_url: "http://nchc.dl.sourceforge.net/project/pygccxml/pygccxml/pygccxml-1.0/pygccxml-{{ PYGCCXML_VERSION }}.zip"
+  tags: pygccxml
+- name: Download pygccxml
+  get_url:
+    url: "{{ pygccxml_url }}"
+    dest: "{{ temp_location }}"
+  tags: pygccxml
+- name: Unzip pygccxml-1.0.0.zip
+  unarchive:
+    src: "{{ temp_location }}/pygccxml-{{ PYGCCXML_VERSION }}.zip"
+    dest: "{{ temp_location }}"
+  tags: pygccxml
+- name: Install pygccxxml
+  command: "python setup.py install"
+  args:
+    chdir: "{{ temp_location }}/pygccxml-{{ PYGCCXML_VERSION }}"
+  tags: pygccxml
+- name: Patch pygccxml config
+  replace:
+    dest: "/usr/local/lib/python2.7/dist-packages/pygccxml/parser/config.py"
+    regexp: "gccxml_path=''"
+    replace: "gccxml_path='/usr/local/bin'"
+    backup: no
+  tags: pygccxml
+- name: Remove pygccxml source code
+  file:
+    path: "{{ temp_location }}/{{ item }}"
+    state: absent
+  with_items:
+    - pygccxml-{{ PYGCCXML_VERSION }}.zip
+    - pygccxml-{{ PYGCCXML_VERSION }}
+  tags: pygccxml

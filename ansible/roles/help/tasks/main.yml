@@ -1,0 +1,7 @@
+---
+- name: Create help
+  template:
+    src: "help.txt.j2"
+    dest: "{{ home_location }}/opennet_help.txt"
+    mode: 0444
+  tags: help

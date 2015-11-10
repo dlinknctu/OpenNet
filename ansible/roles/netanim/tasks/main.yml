@@ -1,0 +1,18 @@
+---
+- name: Set Netanim
+  set_fact:
+    netanim_location: "{{ home_location }}/ns-allinone-{{ NS3_VERSION }}/netanim-{{ NETANIM_VERSION }}"
+  tags: netanim
+- name: qmake Netanim
+  command: "qmake-qt4 NetAnim.pro"
+  args:
+    chdir: "{{ netanim_location }}"
+  tags: netanim
+- name: make Netanim
+  command: "make"
+  args:
+    chdir: "{{ netanim_location }}"
+  async: 0
+  poll: 0
+  ignore_errors: true
+  tags: netanim
