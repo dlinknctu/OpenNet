@@ -1,8 +1,7 @@
 #!/bin/bash
 
 set -e
-PWD=$(pwd)
-OPENNET_PATH=$HOME/opennet
+OPENNET_PATH=$PWD
 ANSIBLE_PATH=$OPENNET_PATH/ansible
 USERDIR=$HOME/.ssh
 user=$(whoami)
@@ -10,10 +9,10 @@ user=$(whoami)
 function Install_Ansible {
 
     apt-get update
-    apt-get install software-properties-common
-    apt-add-repository ppa:ansible/ansible
+    apt-get install -y software-properties-common
+    apt-add-repository -y ppa:ansible/ansible
     apt-get update
-    apt-get install ansible
+    apt-get install -y ansible
 
 }
 
@@ -32,6 +31,7 @@ function SSH_Config_Setup {
     fi
     for host in $hosts; do
         echo "***copying public key to $host"
+        ssh-keyscan -H $host >> ~/.ssh/known_hosts
         ssh-copy-id -i $USERDIR/cluster_key.pub $user@$host &> /dev/null
         echo "***copying key pair to remote host"
         scp $USERDIR/{cluster_key,cluster_key.pub,config} $user@$host:$USERDIR
@@ -80,6 +80,7 @@ function Test_Network {
 function Install_OpenNet {
 
     cd $ANSIBLE_PATH
+    echo "home_location: \"$OPENNET_PATH\"\n" >> group_vars/all
     ansible-playbook playbook.yml
 
 }
@@ -125,4 +126,4 @@ SSH_Config_Setup
 SSH_Daemon_Setup
 Test_Network
 Install_OpenNet
-cat opennet_help.txt
+cat $OPENNET_PATH/opennet_help.txt

@@ -44,4 +44,5 @@
     - uuid-runtime
     - qt4-dev-tools
     - python-networkx
+    - librdmacm-dev
   tags: apt

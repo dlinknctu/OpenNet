@@ -11,10 +11,12 @@ Feature
 
 Build OpenNet on your own - Use install.sh
 ------------------------------------------
-Support Ubuntu 14.04.1  
+Supports Ubuntu 14.04.1  
 
     $ git clone https://github.com/dlinknctu/OpenNet.git
-    $ sudo ./install.sh -a
+    $ cd OpenNet
+    $ sudo ./configure.sh
+    $ sudo ./install.sh master
     After a successful installation, the script will show "OpenNet installation complete."
 
 Run OpenNet
@@ -25,6 +27,8 @@ Please try following commands to run the simulation:
     $ sudo ./waf_shell.sh
     # cd $ROOT_PATH/mininet/examples/opennet
     # python wifiroaming.py
+
+Do not add "sudo" at the head of the third line.  
 
 Run NetAnim
 -----------
