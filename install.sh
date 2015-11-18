@@ -80,7 +80,7 @@ function Test_Network {
 function Install_OpenNet {
 
     cd $ANSIBLE_PATH
-    echo "home_location: \"$OPENNET_PATH\"\n" >> group_vars/all
+    echo "home_location: \"$OPENNET_PATH\"" >> group_vars/all
     ansible-playbook playbook.yml
 
 }
