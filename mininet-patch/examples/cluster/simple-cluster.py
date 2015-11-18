@@ -51,8 +51,8 @@ def demo():
     net.addLink(s1, h1)
 
     # In mininet2
-    s2 = net.addSwitch('s2', server="mininet2")
-    h2 = net.addHost('h2', ip="10.0.0.2", server="mininet2")
+    s2 = net.addSwitch('s2', server=servers[1])
+    h2 = net.addHost('h2', ip="10.0.0.2", server=servers[1])
     net.addLink(s2, h2)
 
     # Cross-link between mininet1 and mininet2
