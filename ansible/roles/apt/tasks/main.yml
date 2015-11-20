@@ -12,6 +12,7 @@
 - name: Install required package
   apt: name={{ item }} state=present
   with_items:
+    - ssh
     - vim
     - tmux
     - git

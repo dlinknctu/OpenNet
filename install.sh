@@ -3,7 +3,7 @@
 set -e
 OPENNET_PATH=$PWD
 ANSIBLE_PATH=$OPENNET_PATH/ansible
-USERDIR=$HOME/.ssh
+SSHDIR=$HOME/.ssh
 user=$(whoami)
 
 function Install_Ansible {
@@ -19,30 +19,33 @@ function Install_Ansible {
 
 function SSH_Config_Setup {
 
-    if [ ! -f $USERDIR/cluster_key.pub ]; then
-        echo "***creating key pair"
-        ssh-keygen -t rsa -C "Cluster_Edition_Key" -f $USERDIR/cluster_key -N '' &> /dev/null
-        cat $USERDIR/cluster_key.pub >> $USERDIR/authorized_keys
+    if [ ! -d $SSHDIR ]; then
+        mkdir -p $SSHDIR
     fi
-    if [ ! -f $USERDIR/config ]; then
+    if [ ! -f $SSHDIR/cluster_key.pub ]; then
+        echo "***creating key pair"
+        ssh-keygen -t rsa -C "Cluster_Edition_Key" -f $SSHDIR/cluster_key -N '' &> /dev/null
+        cat $SSHDIR/cluster_key.pub >> $SSHDIR/authorized_keys
+    fi
+    if [ ! -f $SSHDIR/config ]; then
         echo "***configuring host"
-        echo "IdentityFile $USERDIR/cluster_key" >> $USERDIR/config
-        echo "IdentityFile $USERDIR/id_rsa" >> $USERDIR/config
+        echo "IdentityFile $SSHDIR/cluster_key" >> $SSHDIR/config
+        echo "IdentityFile $SSHDIR/id_rsa" >> $SSHDIR/config
     fi
     for host in $hosts; do
         echo "***copying public key to $host"
         ssh-keyscan -H $host >> ~/.ssh/known_hosts
-        ssh-copy-id -i $USERDIR/cluster_key.pub $user@$host &> /dev/null
+        ssh-copy-id -i $SSHDIR/cluster_key.pub $user@$host &> /dev/null
         echo "***copying key pair to remote host"
-        scp $USERDIR/{cluster_key,cluster_key.pub,config} $user@$host:$USERDIR
+        scp $SSHDIR/{cluster_key,cluster_key.pub,config} $user@$host:$SSHDIR
     done
 
     for host in $hosts; do
         echo "***copying known_hosts to $host"
-        scp $USERDIR/known_hosts $user@$host:$USERDIR/cluster_known_hosts
+        scp $SSHDIR/known_hosts $user@$host:$SSHDIR/cluster_known_hosts
         ssh $user@$host "
-            cat $USERDIR/cluster_known_hosts >> $USERDIR/known_hosts
-            rm $USERDIR/cluster_known_hosts"
+            cat $SSHDIR/cluster_known_hosts >> $SSHDIR/known_hosts
+            rm $SSHDIR/cluster_known_hosts"
     done
 
 }
@@ -60,10 +63,10 @@ function SSH_Daemon_Setup {
 
         for host in $hosts; do
             echo "***copying sshd_config to $host"
-            scp /etc/ssh/sshd_config $user@$host:$USERDIR
+            scp /etc/ssh/sshd_config $user@$host:$SSHDIR
             ssh $user@$host "
-                sudo cp $USERDIR/sshd_config /etc/ssh/sshd_config
-                sudo rm -f $USERDIR/sshd_config
+                sudo cp $SSHDIR/sshd_config /etc/ssh/sshd_config
+                sudo rm -f $SSHDIR/sshd_config
                 sudo service ssh restart"
         done
     fi

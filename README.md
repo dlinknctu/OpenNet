@@ -11,32 +11,48 @@ Feature
 
 Build OpenNet on your own - Use install.sh
 ------------------------------------------
-Supports Ubuntu 14.04.1  
+Supports Ubuntu 14.04.3  
 
-    $ git clone https://github.com/dlinknctu/OpenNet.git
-    $ cd OpenNet
-    $ sudo ./configure.sh
-    $ sudo ./install.sh master
-    After a successful installation, the script will show "OpenNet installation complete."
+    $ sudo su -
+    # apt-get install git ssh
+    # git clone https://github.com/dlinknctu/OpenNet.git
+    # cd OpenNet
+    # ./configure.sh
+    # ./install.sh master
+
+After a successful installation, the script will show "OpenNet installation complete."  
 
 Run OpenNet
 -----------
 Before using OpenNet, you need to prepare SDN controller by yourself.  
 Please try following commands to run the simulation:  
 
-    $ sudo ./waf_shell.sh
-    # cd $ROOT_PATH/mininet/examples/opennet
+    $ sudo su -
+    # cd OpenNet
+    # ./waf_shell.sh
+    # cd ../../mininet/examples/opennet
     # python wifiroaming.py
 
-Do not add "sudo" at the head of the third line.  
+Do not type "sudo python wifiroaming.py", sudo will affect the environment  
+variable required by simulation.  
+
+If the simulation script cannot connect to the controller,  
+stop the network-manager may help.  
+
+    # service network-manager stop
+
+Start the network-manager service after the simulation.  
+
+    # service network-manager start
 
 Run NetAnim
 -----------
 Use NetAnim to open the XML file in the directory /tmp/xml.  
-Click "Play Animation" button can start the animation.
+Click "Play Animation" button can start the animation.  
 
-    $ cd $ROOT_PATH/ns-allinone-$NS3_VERSION/netanim-$NETANIM_VERSION
-    $ ./NetAnim
+    $ sudo su -
+    # cd OpenNet/ns-allinone-$NS3_VERSION/netanim-$NETANIM_VERSION
+    # ./NetAnim
 
 Reference
 ---------
