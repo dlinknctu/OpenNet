@@ -46,4 +46,8 @@
     - qt4-dev-tools
     - python-networkx
     - librdmacm-dev
+    - gawk
+    - libtool
+    - texinfo
+    - libreadline-dev
   tags: apt

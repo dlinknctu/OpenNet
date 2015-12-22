@@ -1,0 +1,73 @@
+---
+- name: Set quagga
+  set_fact:
+    quagga_repos: "git://git.savannah.nongnu.org/quagga.git"
+    quagga_dir_path: "{{ home_location }}/quagga"
+  tags: quagga
+
+- name: Clone quagga
+  git:
+    repo: "{{ quagga_repos }}"
+    dest: "{{ quagga_dir_path }}"
+    update: no
+    accept_hostkey: true
+    version: "quagga-{{ QUAGGA_VERSION }}"
+  tags: quagga
+
+- name: Use Autotools
+  command: "./update-autotools"
+  args:
+    chdir: "{{ quagga_dir_path }}"
+  tags: quagga
+
+- name: Autoreconf
+  command: "autoreconf --force --install"
+  args:
+    chdir: "{{ quagga_dir_path }}"
+  tags: quagga
+
+- name: Configure Quagga
+  command: "./configure --enable-user=root --enable-group=root --enable-vty-group=root --enable-vtysh --sysconfdir=/etc/quagga --prefix=/usr/local"
+  args:
+    chdir: "{{ quagga_dir_path }}"
+  tags: quagga
+
+- name: Make
+  command: "make"
+  args:
+    chdir: "{{ quagga_dir_path }}"
+  tags: quagga
+
+- name: Make install
+  command: "make install"
+  args:
+    chdir: "{{ quagga_dir_path }}"
+  tags: quagga
+
+- name: Link shared libraries
+  command: "ldconfig"
+  tags: quagga
+
+- name: Copy config to /etc/quagga
+  copy:
+    src: "{{ item }}"
+    dest: "/etc/quagga/{{ item }}"
+  with_items:
+    - babeld.conf
+    - bgpd.conf
+    - bgpd_2.conf
+    - isisd.conf
+    - ospf6d.conf
+    - ospfd.conf
+    - ripd.conf
+    - ripngd.conf
+    - vtysh.conf
+    - zebra.conf
+  tags: quagga
+
+- name: Remove quagga source code
+  file:
+    path: "{{ quagga_dir_path }}"
+    state: absent
+  tags: quagga
+
