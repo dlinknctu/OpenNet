@@ -43,16 +43,8 @@ def main():
     ap0 = net.addAP('ap0', wifi, channelNumber=11, ssid="opennet_0", positions=(0, 0, 0))
     ap1 = net.addAP('ap1', wifi, channelNumber=11, ssid="opennet_1", positions=(10, 10, 0))
 
-    sta0 = net.addStation('sta0', ip="10.0.0.1")
-    mininet.ns3.setMobilityModel(sta0, None)
-    mininet.ns3.setVelocity(sta0, 0, 5, 0)
-
-    sta1 = net.addStation('sta1', ip="10.0.0.2")
-    mininet.ns3.setMobilityModel(sta1, None)
-    mininet.ns3.setVelocity(sta1, 5, 0, 0)
-
-    wifi.addSta(sta0, channelNumber=11, ssid="opennet_0")
-    wifi.addSta(sta1, channelNumber=11, ssid="opennet_1")
+    sta0 = net.addStation('sta0', wifi, ip="10.0.0.1", channelNumber=11, ssid="opennet_0", velocitys=(0, 5, 0))
+    sta1 = net.addStation('sta1', wifi, ip="10.0.0.2", channelNumber=11, ssid="opennet_1", velocitys=(5, 0, 0))
 
     net.addLink(sw0, ap0)
     net.addLink(sw0, ap1)

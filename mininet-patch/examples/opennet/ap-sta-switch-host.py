@@ -34,10 +34,7 @@ def main():
         print("I'm a AP")
 
     # About Station
-    sta0 = net.addStation('sta0')
-    mininet.ns3.setMobilityModel(sta0, None)
-    mininet.ns3.setPosition(sta0, 0, 0, 0)
-    wifi.addSta(sta0, channelNumber=6, ssid="opennet_ap")
+    sta0 = net.addStation("sta0", wifi, channelNumber=6, ssid="opennet_ap", positions=(0, 0, 0))
 
     #Check mininet.node.Station
     if isinstance(sta0, mininet.node.Station):
