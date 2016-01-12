@@ -837,7 +837,7 @@ class WifiSegment( object ):
 
     @staticmethod
     def createChannelHelper():
-        channel = ns.wifi.YansWifiChannelHelper ()
+        channelHelper = ns.wifi.YansWifiChannelHelper ()
         return channelHelper
 
     def addChannelPropagationLoss( channelHelper, propagationLossType, **attrs ):
