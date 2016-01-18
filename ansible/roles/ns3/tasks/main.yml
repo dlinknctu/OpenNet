@@ -48,6 +48,11 @@
   poll: 0
   ignore_errors: true
   tags: ns3
+- name: Waf install
+  command: "./waf install"
+  args:
+    chdir: "{{ home_location }}/ns-allinone-{{ NS3_VERSION }}/ns-{{ NS3_VERSION }}"
+  tags: ns3
 - name: Create Waf Shell
   template:
     src: "waf_shell.sh.j2"
