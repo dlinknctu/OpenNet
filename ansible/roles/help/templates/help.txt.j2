@@ -1,9 +1,12 @@
 =======================================================================
-OpenNet installation complete.
-Before using OpenNet, you need to prepare SDN controller by yourself.
+OpenNet installation has completed.
+With an SDN controller, the example script should work fine.
 =======================================================================
-Please try following commands to run the simulation
-$ sudo ./waf_shell.sh
+$ sudo su -
+# cd {{ home_location }}
+# git clone https://github.com/noxrepo/pox.git
+# cd {{ home_location }}/pox
+# ./pox.py forwarding.l2_learning &
 # cd {{ home_location }}/mininet/examples/opennet
 # python wifiroaming.py
 

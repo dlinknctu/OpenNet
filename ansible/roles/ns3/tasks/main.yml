@@ -56,12 +56,6 @@
 - name: Configure dynamic linker run-time bindings
   command: "ldconfig"
   tags: ns3
-- name: Create Waf Shell
-  template:
-    src: "waf_shell.sh.j2"
-    dest: "{{ home_location }}/waf_shell.sh"
-    mode: 0744
-  tags: ns3
 - name: Remove NS3 source code
   file:
     path: "{{ home_location }}/ns-allinone-{{ NS3_VERSION }}.tar.bz2"

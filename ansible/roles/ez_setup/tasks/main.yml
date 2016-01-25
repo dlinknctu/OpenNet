@@ -16,7 +16,7 @@
   register: gg
   tags: ez_setup
 - name: Remove ez_setup source code
-  command: "rm ez_setup.py"
-  args:
-    chdir: "{{ file_path }}"
+  file:
+    path: "{{ file_path }}/ez_setup.py"
+    state: absent
   tags: ez_setup

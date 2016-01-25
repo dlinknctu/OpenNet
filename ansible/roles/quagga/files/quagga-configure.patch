@@ -1,0 +1,10 @@
+--- quagga/configure.ac	2016-01-25 22:42:27.500861718 +0800
++++ quagga-patch/configure.ac	2016-01-25 22:43:25.292774828 +0800
+@@ -10,6 +10,7 @@ AC_PREREQ(2.53)
+ AC_INIT(Quagga, 0.99.25-dev, [https://bugzilla.quagga.net])
+ CONFIG_ARGS="$*"
+ AC_SUBST(CONFIG_ARGS)
++AC_CONFIG_AUX_DIR([.])
+ AC_CONFIG_SRCDIR(lib/zebra.h)
+ AC_CONFIG_MACRO_DIR([m4])
+ 

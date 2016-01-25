@@ -14,10 +14,13 @@
     version: "quagga-{{ QUAGGA_VERSION }}"
   tags: quagga
 
-- name: Use Autotools
-  command: "./update-autotools"
-  args:
-    chdir: "{{ quagga_dir_path }}"
+- name: Patch configure.ac
+  patch:
+    src: "{{ item }}"
+    basedir: "{{ quagga_dir_path }}"
+    strip: 1
+  with_items:
+    - quagga-configure.patch
   tags: quagga
 
 - name: Autoreconf

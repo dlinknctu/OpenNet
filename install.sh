@@ -96,7 +96,7 @@ fi
 echo "***Check hostname in /etc/hosts"
 for i in "$@"; do
     HOST_STATUS=$(cat /etc/hosts | grep -w $i | awk '{print $2}')
-    if [ -z $HOST_STATUS ]; then
+    if [[ -z $HOST_STATUS ]]; then
         echo "Can Not find hostname '$i' in /etc/hosts, please check."
         echo "The format should be like:"
         echo "10.0.0.1 master"

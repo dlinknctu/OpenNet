@@ -1,14 +1,9 @@
 .DS_Store
-openvswitch-*
 ns-allinone-*/*
-openflow/*
 mininet/*
-pygccxml/*
-gccxml/*
 .idea/*
 *.ropeproject*
 *.tar.bz2
 *.zip
 *.deb
-waf_shell.sh
 opennet_help.txt

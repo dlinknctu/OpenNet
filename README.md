@@ -20,24 +20,24 @@ Supports Ubuntu 14.04.3
     # ./configure.sh
     # ./install.sh master
 
-After a successful installation, the script will show "OpenNet installation complete."  
+After a successful installation, the script will show "OpenNet installation has completed."  
 
 Run OpenNet
 -----------
-Before using OpenNet, you need to prepare SDN controller by yourself.  
-Please try following commands to run the simulation:  
+With an SDN controller, the example script should work fine.  
 
     $ sudo su -
     # cd OpenNet
-    # ./waf_shell.sh
-    # cd ../../mininet/examples/opennet
+    # git clone https://github.com/noxrepo/pox.git
+    # cd OpenNet/pox
+    # ./pox.py forwarding.l2_learning &
+    # cd OpenNet/mininet/examples/opennet
     # python wifiroaming.py
 
-Do not type "sudo python wifiroaming.py", sudo will affect the environment  
-variable required by simulation.  
+Do not run the example as "sudo python wifiroaming.py".  
+Sudo will replace environment variables and make the simulation fail.  
 
-If the simulation script cannot connect to the controller,  
-stop the network-manager may help.  
+If the simulation script cannot connect to the controller, stop the network-manager may help.  
 
     # service network-manager stop
 
