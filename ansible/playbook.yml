@@ -9,7 +9,6 @@
     - ez_setup
     - ntp
     - openvswitch
-    - quagga
     - qperf
 
 - hosts: opennet-slave
