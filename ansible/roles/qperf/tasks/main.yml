@@ -39,6 +39,6 @@
   tags: qperf
 - name: Remove qperf source code
   file:
-    path: "{{ temp_location }}/qperf-0.4.9"
+    path: "{{ temp_location }}/qperf-0.4.9.tar.gz"
     state: absent
   tags: qperf

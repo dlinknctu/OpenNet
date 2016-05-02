@@ -1,20 +1,35 @@
 ---
 - name: Set ez_setup
   set_fact:
-    ez_setup_url: "https://bitbucket.org/pypa/setuptools/raw/bootstrap/ez_setup.py"
+    ez_setup_url: "https://bootstrap.pypa.io/ez_setup.py"
     file_path: "/tmp"
   tags: ez_setup
+
+- name: Ensure ez_setup.py does not exist
+  file:
+    path: "{{  file_path }}/ez_setup.py"
+    state: absent
+  tags: ez_setup
+
+- name: Ensure setuptools does not exist
+  file:
+    path: "{{ file_path }}/setuptools-*"
+    state: absent
+  tags: ez_setup
+
 - name: Download ez_setup.py
   get_url:
     url: "{{ ez_setup_url }}"
     dest: "{{ file_path }}"
   tags: ez_setup
+
 - name: Install ez_setup.py
   command: "python ez_setup.py"
   args:
     chdir: "{{ file_path }}"
   register: gg
   tags: ez_setup
+
 - name: Remove ez_setup source code
   file:
     path: "{{ file_path }}/ez_setup.py"
