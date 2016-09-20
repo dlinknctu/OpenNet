@@ -16,7 +16,6 @@ function Install_Ansible {
 
 }
 
-
 function SSH_Config_Setup {
 
     if [ ! -d $SSHDIR ]; then
@@ -34,7 +33,7 @@ function SSH_Config_Setup {
     fi
     for host in $hosts; do
         echo "***copying public key to $host"
-        ssh-keyscan -H $host >> ~/.ssh/known_hosts
+        ssh-keyscan -H $host >> $SSHDIR/known_hosts
         ssh-copy-id -i $SSHDIR/cluster_key.pub $user@$host &> /dev/null
         echo "***copying key pair to remote host"
         scp $SSHDIR/{cluster_key,cluster_key.pub,config} $user@$host:$SSHDIR
@@ -83,7 +82,7 @@ function Test_Network {
 function Install_OpenNet {
 
     cd $ANSIBLE_PATH
-    echo "home_location: \"$OPENNET_PATH\"" >> group_vars/all
+    sed -e "s|home_location: \"\"|home_location: \"$OPENNET_PATH\"|" -i group_vars/all
     ansible-playbook playbook.yml
 
 }
