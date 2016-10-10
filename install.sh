@@ -82,7 +82,7 @@ function Test_Network {
 function Install_OpenNet {
 
     cd $ANSIBLE_PATH
-    sed -e "s|home_location: \"\"|home_location: \"$OPENNET_PATH\"|" -i group_vars/all
+    sed -e "s|home_location: \"*.*\"|home_location: \"$OPENNET_PATH\"|" -i group_vars/all
     ansible-playbook playbook.yml
 
 }
