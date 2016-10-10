@@ -1,0 +1,5537 @@
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/fd-net-device/helper/tap-device-creator.cc ns-3.22/src/fd-net-device/helper/tap-device-creator.cc
+--- ns-3.22-backup/src/fd-net-device/helper/tap-device-creator.cc	2015-02-06 07:46:22.000000000 +0800
++++ ns-3.22/src/fd-net-device/helper/tap-device-creator.cc	2016-10-10 22:48:30.412415107 +0800
+@@ -348,7 +348,6 @@ main (int argc, char *argv[])
+   // allocating.  This address is allocated in the simulation and assigned to
+   // the tap bridge.  This address is given in ip.
+   //
+-  ABORT_IF (ip4 == NULL && ip6 == NULL, "IP Address is a required argument", 0);
+   if (ip4)
+     {
+       ABORT_IF (netmask == NULL, "Net mask is a required argument", 0);
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/fd-net-device/helper/tap-fd-net-device-helper.cc ns-3.22/src/fd-net-device/helper/tap-fd-net-device-helper.cc
+--- ns-3.22-backup/src/fd-net-device/helper/tap-fd-net-device-helper.cc	2015-02-06 07:46:22.000000000 +0800
++++ ns-3.22/src/fd-net-device/helper/tap-fd-net-device-helper.cc	2016-10-10 22:48:30.412415107 +0800
+@@ -66,9 +66,10 @@ TapFdNetDeviceHelper::TapFdNetDeviceHelp
+   m_modePi = false;
+   m_tapIp4 = "";
+   m_tapMask4 = "";
+-  m_tapIp6 = "";
++  m_tapIp6 = Ipv6Address::GetZero ();
+   m_tapPrefix6 = 64;
+   m_tapMac = Mac48Address::Allocate ();
++  m_dscpMarking = FdNetDevice::NoDscp;
+ }
+ 
+ void
+@@ -107,6 +108,12 @@ TapFdNetDeviceHelper::SetTapMacAddress (
+   m_tapMac = mac;
+ }
+ 
++void
++TapFdNetDeviceHelper::SetDscpMarking (FdNetDevice::DscpMarking dscpMarking)
++{
++  m_dscpMarking = dscpMarking;
++}
++
+ Ptr<NetDevice>
+ TapFdNetDeviceHelper::InstallPriv (Ptr<Node> node) const
+ {
+@@ -125,6 +132,8 @@ TapFdNetDeviceHelper::InstallPriv (Ptr<N
+       fdnd->SetEncapsulationMode (FdNetDevice::DIXPI);
+     }
+ 
++  fdnd->SetDscpMarking (m_dscpMarking);
++
+   SetFileDescriptor (device);
+   return device;
+ }
+@@ -234,7 +243,7 @@ TapFdNetDeviceHelper::CreateFileDescript
+         }
+ 
+       std::ostringstream ossIp6;
+-      if (m_tapIp6 != "")
++      if (m_tapIp6 != Ipv6Address::GetZero ())
+         {
+           ossIp6 << "-I" << m_tapIp6;
+         }
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/fd-net-device/helper/tap-fd-net-device-helper.h ns-3.22/src/fd-net-device/helper/tap-fd-net-device-helper.h
+--- ns-3.22-backup/src/fd-net-device/helper/tap-fd-net-device-helper.h	2015-02-06 07:46:22.000000000 +0800
++++ ns-3.22/src/fd-net-device/helper/tap-fd-net-device-helper.h	2016-10-10 22:48:30.416415077 +0800
+@@ -91,6 +91,8 @@ public:
+    */
+   void SetTapMacAddress (Mac48Address mac);
+ 
++  void SetDscpMarking (FdNetDevice::DscpMarking dscpMarking);
++
+ protected:
+ 
+   Ptr<NetDevice> InstallPriv (Ptr<Node> node) const;
+@@ -136,6 +138,8 @@ protected:
+    */
+   Mac48Address m_tapMac;
+ 
++  FdNetDevice::DscpMarking m_dscpMarking;
++
+ };
+ 
+ } // namespace ns3
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/fd-net-device/model/fd-net-device.cc ns-3.22/src/fd-net-device/model/fd-net-device.cc
+--- ns-3.22-backup/src/fd-net-device/model/fd-net-device.cc	2015-02-06 07:46:22.000000000 +0800
++++ ns-3.22/src/fd-net-device/model/fd-net-device.cc	2016-10-10 22:48:30.416415077 +0800
+@@ -40,6 +40,13 @@
+ #include <arpa/inet.h>
+ #include <net/ethernet.h>
+ 
++#include "ns3/ipv4-header.h"
++#include "ns3/ipv4-l3-protocol.h"
++#include "ns3/udp-l4-protocol.h"
++#include "ns3/udp-header.h"
++#include "ns3/epc-gtpu-header.h"
++#include "ns3/teid-dscp-mapping.h"
++
+ namespace ns3 {
+ 
+ NS_LOG_COMPONENT_DEFINE ("FdNetDevice");
+@@ -113,6 +120,12 @@ FdNetDevice::GetTypeId (void)
+                    UintegerValue (1000),
+                    MakeUintegerAccessor (&FdNetDevice::m_maxPendingReads),
+                    MakeUintegerChecker<uint32_t> ())
++    .AddAttribute ("DscpMarking",
++                   "Enable DSCP marking for QoS",
++                   EnumValue (NoDscp),
++                   MakeEnumAccessor (&FdNetDevice::SetDscpMarking),
++                   MakeEnumChecker (MarkDscp, "MarkDscp",
++                                    NoDscp, "NoDscp"))
+     //
+     // Trace sources at the "top" of the net device, where packets transition
+     // to/from higher layers.  These points do not really correspond to the
+@@ -212,6 +225,12 @@ FdNetDevice::GetEncapsulationMode (void)
+ }
+ 
+ void
++FdNetDevice::SetDscpMarking (FdNetDevice::DscpMarking dscpMarking)
++{
++  m_dscpMarking = dscpMarking;
++}
++
++void
+ FdNetDevice::Start (Time tStart)
+ {
+   NS_LOG_FUNCTION (tStart);
+@@ -502,6 +521,38 @@ FdNetDevice::SendFrom (Ptr<Packet> packe
+       return false;
+     }
+ 
++  if (m_dscpMarking == MarkDscp && protocolNumber == Ipv4L3Protocol::PROT_NUMBER)
++    {
++      Ptr<Packet> pCopy = packet->Copy ();
++      Ipv4Header ipv4Header;
++      UdpHeader udpHeader;
++      GtpuHeader gtpu;
++      uint16_t destPort = 0;
++      uint16_t srcPort = 0;
++
++      pCopy->RemoveHeader (ipv4Header);
++      if (ipv4Header.GetProtocol () == UdpL4Protocol::PROT_NUMBER)
++        {
++          pCopy->RemoveHeader (udpHeader);
++          srcPort = udpHeader.GetSourcePort ();
++          destPort = udpHeader.GetDestinationPort ();
++        }
++
++      if (srcPort == 2152 && destPort == 2152)
++        {
++          pCopy->RemoveHeader (gtpu);
++          uint32_t teid = gtpu.GetTeid ();
++          Ipv4Header::DscpType dscp = TeidDscpMapping::GetTeidDscpMapping (teid);
++
++          NS_LOG_DEBUG ("FdNetDevice::SendFrom TEID: " << teid << " DSCP: " << dscp);
++
++          packet->RemoveHeader (ipv4Header);
++          ipv4Header.SetDscp (dscp);
++          ipv4Header.EnableChecksum ();
++          packet->AddHeader (ipv4Header);
++        }
++    }
++
+   Mac48Address destination = Mac48Address::ConvertFrom (dest);
+   Mac48Address source = Mac48Address::ConvertFrom (src);
+ 
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/fd-net-device/model/fd-net-device.h ns-3.22/src/fd-net-device/model/fd-net-device.h
+--- ns-3.22-backup/src/fd-net-device/model/fd-net-device.h	2015-02-06 07:46:22.000000000 +0800
++++ ns-3.22/src/fd-net-device/model/fd-net-device.h	2016-10-10 22:48:30.416415077 +0800
+@@ -99,6 +99,12 @@ public:
+                       Raw protocol(IP, IPv6, etc) frame. */
+   };
+ 
++  enum DscpMarking
++  {
++    MarkDscp,
++    NoDscp
++  };
++
+   /**
+    * Constructor for the FdNetDevice.
+    */
+@@ -117,6 +123,8 @@ public:
+    */
+   void SetEncapsulationMode (FdNetDevice::EncapsulationMode mode);
+ 
++  void SetDscpMarking (FdNetDevice::DscpMarking dscpMarking);
++
+   /**
+    * Get the link layer encapsulation mode of this device.
+    *
+@@ -252,6 +260,8 @@ private:
+    */
+   EncapsulationMode m_encapMode;
+ 
++  DscpMarking m_dscpMarking;
++
+   /**
+    * Flag indicating whether or not the link is up.  In this case,
+    * whether or not the device is connected to a channel.
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/helper/epc-helper-header.cc ns-3.22/src/lte/helper/epc-helper-header.cc
+--- ns-3.22-backup/src/lte/helper/epc-helper-header.cc	1970-01-01 08:00:00.000000000 +0800
++++ ns-3.22/src/lte/helper/epc-helper-header.cc	2016-09-22 23:09:33.041597417 +0800
+@@ -0,0 +1,557 @@
++
++#include <ns3/log.h>
++#include <ns3/epc-helper-header.h>
++
++namespace ns3 {
++
++NS_LOG_COMPONENT_DEFINE ("EpcHelperHeader");
++
++NS_OBJECT_ENSURE_REGISTERED (EpcHelperHeader);
++
++EpcHelperHeader::EpcHelperHeader ()
++  : m_procedureCode (0x00),
++    m_typeOfMessage (0x00)
++{
++}
++
++EpcHelperHeader::~EpcHelperHeader ()
++{
++}
++
++TypeId
++EpcHelperHeader::GetTypeId (void)
++{
++  static TypeId tid = TypeId ("ns3::EpcHelperHeader")
++    .SetParent<Header> ()
++    .SetGroupName ("Lte")
++    .AddConstructor<EpcHelperHeader> ()
++  ;
++  return tid;
++}
++
++TypeId
++EpcHelperHeader::GetInstanceTypeId (void) const
++{
++  return GetTypeId ();
++}
++
++uint32_t
++EpcHelperHeader::GetSerializedSize (void) const
++{
++  return 2;
++}
++
++void
++EpcHelperHeader::Serialize (Buffer::Iterator start) const
++{
++  Buffer::Iterator i = start;
++  i.WriteU8 (m_procedureCode);
++  i.WriteU8 (m_typeOfMessage);
++}
++
++uint32_t
++EpcHelperHeader::Deserialize (Buffer::Iterator start)
++{
++  Buffer::Iterator i = start;
++  m_procedureCode = i.ReadU8 ();
++  m_typeOfMessage = i.ReadU8 ();
++  return GetSerializedSize ();
++}
++
++void
++EpcHelperHeader::Print (std::ostream &os) const
++{
++  os << "ProcedureCode=" << m_procedureCode;
++  os << "TypeOfMessage=" << m_typeOfMessage;
++}
++
++uint8_t
++EpcHelperHeader::GetTypeOfMessage () const
++{
++  return m_typeOfMessage;
++}
++
++void
++EpcHelperHeader::SetTypeOfMessage (uint8_t typeOfMessage)
++{
++  m_typeOfMessage = typeOfMessage;
++}
++  
++uint8_t
++EpcHelperHeader::GetProcedureCode () const
++{
++  return m_procedureCode;
++}
++
++void
++EpcHelperHeader::SetProcedureCode (uint8_t procedureCode)
++{
++  m_procedureCode = procedureCode;
++}
++
++NS_OBJECT_ENSURE_REGISTERED (AddEnbRequestHeader);
++
++AddEnbRequestHeader::AddEnbRequestHeader ()
++  : m_numberOfIes (0x00),
++    m_headerLength (0x0A),
++    m_cellId (0x00),
++    m_enbAddress (),
++    m_sgwAddress ()
++{
++}
++
++AddEnbRequestHeader::~AddEnbRequestHeader ()
++{
++}
++
++TypeId
++AddEnbRequestHeader::GetTypeId (void)
++{
++  static TypeId tid = TypeId ("ns3::AddEnbRequestHeader")
++    .SetParent<Header> ()
++    .SetGroupName ("Lte")
++    .AddConstructor<AddEnbRequestHeader> ()
++  ;
++  return tid;
++}
++
++TypeId
++AddEnbRequestHeader::GetInstanceTypeId (void) const
++{
++  return GetTypeId ();
++}
++
++uint32_t
++AddEnbRequestHeader::GetSerializedSize (void) const
++{
++  return m_headerLength;
++}
++
++void
++AddEnbRequestHeader::Serialize (Buffer::Iterator start) const
++{
++  Buffer::Iterator i = start;
++  i.WriteHtonU16 (m_cellId);
++  i.WriteHtonU32 (m_enbAddress.Get ());
++  i.WriteHtonU32 (m_sgwAddress.Get ());
++}
++
++uint32_t
++AddEnbRequestHeader::Deserialize (Buffer::Iterator start)
++{
++  Buffer::Iterator i = start;
++  m_headerLength = 0;
++  
++  m_cellId = i.ReadNtohU16 ();
++  m_headerLength += sizeof m_cellId;
++  ++m_numberOfIes;
++  
++  m_enbAddress = Ipv4Address (i.ReadNtohU32 ());
++  m_headerLength += sizeof(uint32_t);
++  ++m_numberOfIes;
++  
++  m_sgwAddress = Ipv4Address (i.ReadNtohU32 ());
++  m_headerLength += sizeof(uint32_t);
++  ++m_numberOfIes;
++  return GetSerializedSize ();
++}
++
++void
++AddEnbRequestHeader::Print (std::ostream &os) const
++{
++  os << "CellId=" << m_cellId;
++  os << "EnbAddress=" << m_enbAddress;
++  os << "SgwAddress=" << m_sgwAddress;
++}
++
++uint16_t
++AddEnbRequestHeader::GetCellId () const
++{
++  return m_cellId;
++}
++
++void
++AddEnbRequestHeader::SetCellId (uint16_t cellId)
++{
++  m_cellId = cellId;
++}
++ 
++Ipv4Address
++AddEnbRequestHeader::GetEnbAddress () const
++{
++  return m_enbAddress;
++}
++
++void
++AddEnbRequestHeader::SetEnbAddress (Ipv4Address enbAddress)
++{
++  m_enbAddress = enbAddress;
++}
++
++Ipv4Address
++AddEnbRequestHeader::GetSgwAddress () const
++{
++  return m_sgwAddress;
++}
++
++void
++AddEnbRequestHeader::SetSgwAddress (Ipv4Address sgwAddress)
++{
++  m_sgwAddress = sgwAddress;
++}
++
++NS_OBJECT_ENSURE_REGISTERED (AddUeRequestHeader);
++
++AddUeRequestHeader::AddUeRequestHeader ()
++  : m_numberOfIes (0x00),
++    m_headerLength (0x08),
++    m_imsi (0x00)
++{
++}
++
++AddUeRequestHeader::~AddUeRequestHeader ()
++{
++}
++
++TypeId
++AddUeRequestHeader::GetTypeId (void)
++{
++  static TypeId tid = TypeId ("ns3::AddUeRequestHeader")
++    .SetParent<Header> ()
++    .SetGroupName ("Lte")
++    .AddConstructor<AddUeRequestHeader> ()
++  ;
++  return tid;
++}
++
++TypeId
++AddUeRequestHeader::GetInstanceTypeId (void) const
++{
++  return GetTypeId ();
++}
++
++uint32_t
++AddUeRequestHeader::GetSerializedSize (void) const
++{
++  return m_headerLength;
++}
++
++void
++AddUeRequestHeader::Serialize (Buffer::Iterator start) const
++{
++  Buffer::Iterator i = start;
++  i.WriteHtonU64 (m_imsi);
++}
++
++uint32_t
++AddUeRequestHeader::Deserialize (Buffer::Iterator start)
++{
++  Buffer::Iterator i = start;
++  m_headerLength = 0;
++  
++  m_imsi = i.ReadNtohU64 ();
++  m_headerLength += sizeof m_imsi;
++  ++m_numberOfIes;
++  return GetSerializedSize ();
++}
++
++void
++AddUeRequestHeader::Print (std::ostream &os) const
++{
++  os << "Imsi=" << m_imsi;
++}
++
++uint16_t
++AddUeRequestHeader::GetImsi () const
++{
++  return m_imsi;
++}
++
++void
++AddUeRequestHeader::SetImsi (uint64_t imsi)
++{
++  m_imsi = imsi;
++}
++
++NS_OBJECT_ENSURE_REGISTERED (ActivateEpsBearerRequestHeader);
++
++ActivateEpsBearerRequestHeader::ActivateEpsBearerRequestHeader ()
++  : m_numberOfIes (0x00),
++    m_headerLength (0x4E),
++    m_imsi (0x00),
++    m_ueAddress (),
++    m_tft (),
++    m_bearer ()
++{
++}
++
++ActivateEpsBearerRequestHeader::~ActivateEpsBearerRequestHeader ()
++{
++}
++
++TypeId
++ActivateEpsBearerRequestHeader::GetTypeId (void)
++{
++  static TypeId tid = TypeId ("ns3::ActivateEpsBearerRequestHeader")
++    .SetParent<Header> ()
++    .SetGroupName ("Lte")
++    .AddConstructor<ActivateEpsBearerRequestHeader> ()
++  ;
++  return tid;
++}
++
++TypeId
++ActivateEpsBearerRequestHeader::GetInstanceTypeId (void) const
++{
++  return GetTypeId ();
++}
++
++uint32_t
++ActivateEpsBearerRequestHeader::GetSerializedSize (void) const
++{
++  return m_headerLength;
++}
++
++void
++ActivateEpsBearerRequestHeader::Serialize (Buffer::Iterator start) const
++{
++  Buffer::Iterator i = start;
++  i.WriteHtonU64 (m_imsi);
++  i.WriteHtonU32 (m_ueAddress.Get ());
++  
++  i.WriteU8 (m_tftNumFilters);
++  std::list<EpcTft::PacketFilter> filters = m_tftFilters;
++  std::list<EpcTft::PacketFilter>::iterator it;
++  for (it = filters.begin (); it != filters.end (); ++it)
++    {
++      i.WriteU8 (it->precedence);
++      i.WriteU8 (it->direction);
++      
++      i.WriteHtonU32 (it->remoteAddress.Get ());
++      i.WriteHtonU32 (it->remoteMask.Get ());
++      i.WriteHtonU32 (it->localAddress.Get ());
++      i.WriteHtonU32 (it->localMask.Get ());
++      
++      i.WriteHtonU16 (it->remotePortStart);
++      i.WriteHtonU16 (it->remotePortEnd);
++      i.WriteHtonU16 (it->localPortStart);
++      i.WriteHtonU16 (it->localPortEnd);
++      
++      i.WriteU8 (it->typeOfService);
++      i.WriteU8 (it->typeOfServiceMask);
++    }
++  
++  i.WriteHtonU16 (m_bearer.qci);
++  i.WriteHtonU64 (m_bearer.gbrQosInfo.gbrDl);
++  i.WriteHtonU64 (m_bearer.gbrQosInfo.gbrUl);
++  i.WriteHtonU64 (m_bearer.gbrQosInfo.mbrDl);
++  i.WriteHtonU64 (m_bearer.gbrQosInfo.mbrUl);
++  i.WriteU8 (m_bearer.arp.priorityLevel);
++  i.WriteU8 (m_bearer.arp.preemptionCapability);
++  i.WriteU8 (m_bearer.arp.preemptionVulnerability);
++}
++
++uint32_t
++ActivateEpsBearerRequestHeader::Deserialize (Buffer::Iterator start)
++{
++  Buffer::Iterator i = start;
++  m_headerLength = 0;
++  
++  m_imsi = i.ReadNtohU64 ();
++  m_headerLength += sizeof m_imsi;
++  ++m_numberOfIes;
++  
++  m_ueAddress = Ipv4Address (i.ReadNtohU32 ());
++  m_headerLength += sizeof(uint32_t);
++  ++m_numberOfIes;
++  
++  m_tftNumFilters = i.ReadU8 ();
++  m_tft.SetNumFilters (m_tftNumFilters);
++  m_headerLength += sizeof(uint8_t);
++  ++m_numberOfIes;
++  
++  std::list<EpcTft::PacketFilter> filters;
++  for (uint8_t j = 0; j < m_tftNumFilters; ++j)
++    {
++      EpcTft::PacketFilter filter;
++      filter.precedence = i.ReadU8 ();
++      switch (i.ReadU8 ())
++        {
++          case EpcTft::DOWNLINK:
++             filter.direction = EpcTft::DOWNLINK;
++          case EpcTft::UPLINK:
++             filter.direction = EpcTft::UPLINK;
++          case EpcTft::BIDIRECTIONAL:
++             filter.direction = EpcTft::BIDIRECTIONAL;
++        }
++      m_headerLength += sizeof(uint8_t) * 2;
++      
++      filter.remoteAddress = Ipv4Address (i.ReadNtohU32 ());
++      filter.remoteMask = Ipv4Mask (i.ReadNtohU32 ());
++      filter.localAddress = Ipv4Address (i.ReadNtohU32 ());
++      filter.localMask = Ipv4Mask (i.ReadNtohU32 ());
++      m_headerLength += sizeof(uint32_t) * 4;
++      
++      filter.remotePortStart = i.ReadNtohU16 ();
++      filter.remotePortEnd = i.ReadNtohU16 ();
++      filter.localPortStart = i.ReadNtohU16 ();
++      filter.localPortEnd = i.ReadNtohU16 ();
++      m_headerLength += sizeof(uint16_t) * 4;
++      
++      filter.typeOfService = i.ReadU8 ();
++      filter.typeOfServiceMask = i.ReadU8 ();
++      m_headerLength += sizeof(uint8_t) * 2;
++      
++      filters.push_back (filter);
++      ++m_numberOfIes;
++    }
++  m_tft.SetFilters (filters);
++    
++  m_bearer = EpsBearer ((EpsBearer::Qci) i.ReadNtohU16 ());
++  m_headerLength += sizeof(uint16_t);
++  
++  m_bearer.gbrQosInfo.gbrDl = i.ReadNtohU64 ();
++  m_bearer.gbrQosInfo.gbrUl = i.ReadNtohU64 ();
++  m_bearer.gbrQosInfo.mbrDl = i.ReadNtohU64 ();
++  m_bearer.gbrQosInfo.mbrUl = i.ReadNtohU64 ();
++  m_headerLength += sizeof(uint64_t) * 4;
++  
++  m_bearer.arp.priorityLevel = i.ReadU8 ();
++  m_bearer.arp.preemptionCapability = i.ReadU8 ();
++  m_bearer.arp.preemptionVulnerability = i.ReadU8 ();
++  m_headerLength += sizeof(uint8_t) * 3;
++  
++  return GetSerializedSize ();
++}
++
++void
++ActivateEpsBearerRequestHeader::Print (std::ostream &os) const
++{
++  os << "Imsi=" << m_imsi;
++  os << "UeAddress=" << m_ueAddress;
++}
++
++uint64_t
++ActivateEpsBearerRequestHeader::GetImsi () const
++{
++  return m_imsi;
++}
++
++void
++ActivateEpsBearerRequestHeader::SetImsi (uint64_t imsi)
++{
++  m_imsi = imsi;
++}
++
++Ipv4Address
++ActivateEpsBearerRequestHeader::GetUeAddress () const
++{
++  return m_ueAddress;
++}
++
++void
++ActivateEpsBearerRequestHeader::SetUeAddress (Ipv4Address ueAddress)
++{
++  m_ueAddress = ueAddress;
++}
++  
++EpcTft
++ActivateEpsBearerRequestHeader::GetEpcTft () const
++{
++  return m_tft;
++}
++
++void
++ActivateEpsBearerRequestHeader::SetEpcTft (EpcTft tft)
++{
++  m_tft = tft;
++  m_tftFilters = m_tft.GetFilters ();
++  m_tftNumFilters = m_tft.GetNumFilters ();
++}
++  
++EpsBearer
++ActivateEpsBearerRequestHeader::GetEpsBearer () const
++{
++ return m_bearer;
++}
++
++void
++ActivateEpsBearerRequestHeader::SetEpsBearer (EpsBearer bearer)
++{
++  m_bearer = bearer;
++}
++
++NS_OBJECT_ENSURE_REGISTERED (ActivateEpsBearerResponseHeader);
++
++ActivateEpsBearerResponseHeader::ActivateEpsBearerResponseHeader ()
++  : m_numberOfIes (0x00),
++    m_headerLength (0x01),
++    m_bearerId (0x00)
++{
++}
++
++ActivateEpsBearerResponseHeader::~ActivateEpsBearerResponseHeader ()
++{
++}
++
++TypeId
++ActivateEpsBearerResponseHeader::GetTypeId (void)
++{
++  static TypeId tid = TypeId ("ns3::ActivateEpsBearerResponseHeader")
++    .SetParent<Header> ()
++    .SetGroupName ("Lte")
++    .AddConstructor<ActivateEpsBearerResponseHeader> ()
++  ;
++  return tid;
++}
++
++TypeId
++ActivateEpsBearerResponseHeader::GetInstanceTypeId (void) const
++{
++  return GetTypeId ();
++}
++
++uint32_t
++ActivateEpsBearerResponseHeader::GetSerializedSize (void) const
++{
++  return m_headerLength;
++}
++
++void
++ActivateEpsBearerResponseHeader::Serialize (Buffer::Iterator start) const
++{
++  Buffer::Iterator i = start;
++  i.WriteU8 (m_bearerId);
++}
++
++uint32_t
++ActivateEpsBearerResponseHeader::Deserialize (Buffer::Iterator start)
++{
++  Buffer::Iterator i = start;
++  m_headerLength = 0;
++  
++  m_bearerId = i.ReadU8 ();
++  m_headerLength += sizeof m_bearerId;
++  ++m_numberOfIes;
++  return GetSerializedSize ();
++}
++
++void
++ActivateEpsBearerResponseHeader::Print (std::ostream &os) const
++{
++  os << "BearerId=" << m_bearerId;
++}
++
++uint8_t
++ActivateEpsBearerResponseHeader::GetBearerId () const
++{
++  return m_bearerId;
++}
++
++void
++ActivateEpsBearerResponseHeader::SetBearerId (uint8_t bearerId)
++{
++  m_bearerId = bearerId;
++}
++
++}
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/helper/epc-helper-header.h ns-3.22/src/lte/helper/epc-helper-header.h
+--- ns-3.22-backup/src/lte/helper/epc-helper-header.h	1970-01-01 08:00:00.000000000 +0800
++++ ns-3.22/src/lte/helper/epc-helper-header.h	2016-09-22 23:09:33.041597417 +0800
+@@ -0,0 +1,168 @@
++
++#ifndef EPC_HELPER_HEADER_H
++#define EPC_HELPER_HEADER_H
++
++#include <ns3/header.h>
++#include <ns3/epc-tft.h>
++#include <ns3/eps-bearer.h>
++
++namespace ns3 {
++
++class EpcHelperHeader : public Header
++{
++public:
++  EpcHelperHeader ();
++  virtual ~EpcHelperHeader ();
++  
++  static TypeId GetTypeId (void);
++  virtual TypeId GetInstanceTypeId (void) const;
++  virtual uint32_t GetSerializedSize (void) const;
++  virtual void Serialize (Buffer::Iterator start) const;
++  virtual uint32_t Deserialize (Buffer::Iterator start);
++  virtual void Print (std::ostream &os) const;
++  
++  uint8_t GetProcedureCode () const;
++  void SetProcedureCode (uint8_t procedureCode);
++  
++  uint8_t GetTypeOfMessage () const;
++  void SetTypeOfMessage (uint8_t typeOfMessage);
++
++  enum ProcedureCode_t
++  {
++    AddUe = 1,
++    AddEnb = 2,
++    ActivateEpsBearer = 3,
++  };
++
++  enum TypeOfMessgae_t
++  {
++    InitiatingMessage = 4,
++    SuccessfulOutcome = 5,
++    UnsuccessfulOutcome = 6
++  };
++
++private:
++  uint8_t m_procedureCode;
++  uint8_t m_typeOfMessage;
++};
++
++
++class AddEnbRequestHeader : public Header
++{
++public:
++  AddEnbRequestHeader ();
++  virtual ~AddEnbRequestHeader ();
++  
++  static TypeId GetTypeId (void);
++  virtual TypeId GetInstanceTypeId (void) const;
++  virtual uint32_t GetSerializedSize (void) const;
++  virtual void Serialize (Buffer::Iterator start) const;
++  virtual uint32_t Deserialize (Buffer::Iterator start);
++  virtual void Print (std::ostream &os) const;
++  
++  uint16_t GetCellId () const;
++  void SetCellId (uint16_t cellId);
++  
++  Ipv4Address GetEnbAddress () const;
++  void SetEnbAddress (Ipv4Address enbAddress);
++
++  Ipv4Address GetSgwAddress () const;
++  void SetSgwAddress (Ipv4Address sgwAddress);
++
++private:
++  uint32_t m_numberOfIes;
++  uint32_t m_headerLength;
++
++  uint16_t m_cellId;
++  Ipv4Address m_enbAddress;
++  Ipv4Address m_sgwAddress;
++};
++
++class AddUeRequestHeader : public Header
++{
++public:
++  AddUeRequestHeader ();
++  virtual ~AddUeRequestHeader ();
++  
++  static TypeId GetTypeId (void);
++  virtual TypeId GetInstanceTypeId (void) const;
++  virtual uint32_t GetSerializedSize (void) const;
++  virtual void Serialize (Buffer::Iterator start) const;
++  virtual uint32_t Deserialize (Buffer::Iterator start);
++  virtual void Print (std::ostream &os) const;
++  
++  uint16_t GetImsi () const;
++  void SetImsi (uint64_t imsi);
++  
++private:
++  uint32_t m_numberOfIes;
++  uint32_t m_headerLength;
++
++  uint64_t m_imsi;
++};
++
++class ActivateEpsBearerRequestHeader : public Header
++{
++public:
++  ActivateEpsBearerRequestHeader ();
++  virtual ~ActivateEpsBearerRequestHeader ();
++  
++  static TypeId GetTypeId (void);
++  virtual TypeId GetInstanceTypeId (void) const;
++  virtual uint32_t GetSerializedSize (void) const;
++  virtual void Serialize (Buffer::Iterator start) const;
++  virtual uint32_t Deserialize (Buffer::Iterator start);
++  virtual void Print (std::ostream &os) const;
++  
++  uint64_t GetImsi () const;
++  void SetImsi (uint64_t imsi);
++  
++  Ipv4Address GetUeAddress () const;
++  void SetUeAddress (Ipv4Address ueAddress);
++  
++  EpcTft GetEpcTft () const;
++  void SetEpcTft (EpcTft tft);
++  
++  EpsBearer GetEpsBearer () const;
++  void SetEpsBearer (EpsBearer bearer);
++
++private:
++  uint32_t m_numberOfIes;
++  uint32_t m_headerLength;
++
++  uint64_t m_imsi;
++  Ipv4Address m_ueAddress;
++  
++  EpcTft m_tft;
++  std::list<EpcTft::PacketFilter> m_tftFilters;
++  uint8_t m_tftNumFilters;
++
++  EpsBearer m_bearer;
++};
++
++class ActivateEpsBearerResponseHeader : public Header
++{
++public:
++  ActivateEpsBearerResponseHeader ();
++  virtual ~ActivateEpsBearerResponseHeader ();
++  
++  static TypeId GetTypeId (void);
++  virtual TypeId GetInstanceTypeId (void) const;
++  virtual uint32_t GetSerializedSize (void) const;
++  virtual void Serialize (Buffer::Iterator start) const;
++  virtual uint32_t Deserialize (Buffer::Iterator start);
++  virtual void Print (std::ostream &os) const;
++  
++  uint8_t GetBearerId () const;
++  void SetBearerId (uint8_t bearerId);
++
++private:
++  uint32_t m_numberOfIes;
++  uint32_t m_headerLength;
++
++  uint8_t m_bearerId;
++};
++
++} // namespace ns3
++
++#endif // EPC_HELPER_HEADER_H
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/helper/lte-helper.cc ns-3.22/src/lte/helper/lte-helper.cc
+--- ns-3.22-backup/src/lte/helper/lte-helper.cc	2015-02-06 07:46:23.000000000 +0800
++++ ns-3.22/src/lte/helper/lte-helper.cc	2016-10-10 22:48:30.416415077 +0800
+@@ -28,6 +28,7 @@
+ #include <ns3/lte-enb-rrc.h>
+ #include <ns3/epc-ue-nas.h>
+ #include <ns3/epc-enb-application.h>
++#include <ns3/tap-epc-enb-application.h>
+ #include <ns3/lte-ue-rrc.h>
+ #include <ns3/lte-ue-mac.h>
+ #include <ns3/lte-enb-mac.h>
+@@ -57,7 +58,6 @@
+ #include <ns3/phy-tx-stats-calculator.h>
+ #include <ns3/phy-rx-stats-calculator.h>
+ #include <ns3/epc-helper.h>
+-#include <iostream>
+ #include <ns3/buildings-propagation-loss-model.h>
+ #include <ns3/lte-spectrum-value-helper.h>
+ #include <ns3/epc-x2.h>
+@@ -129,7 +129,6 @@ LteHelper::DoInitialize (void)
+   m_phyRxStats = CreateObject<PhyRxStatsCalculator> ();
+   m_macStats = CreateObject<MacStatsCalculator> ();
+   Object::DoInitialize ();
+-
+ }
+ 
+ LteHelper::~LteHelper (void)
+@@ -213,7 +212,6 @@ LteHelper::DoDispose ()
+   Object::DoDispose ();
+ }
+ 
+-
+ void 
+ LteHelper::SetEpcHelper (Ptr<EpcHelper> h)
+ {
+@@ -221,6 +219,18 @@ LteHelper::SetEpcHelper (Ptr<EpcHelper>
+   m_epcHelper = h;
+ }
+ 
++void
++LteHelper::SetImsiCounter (uint64_t base)
++{
++  m_imsiCounter = base;
++}
++
++void
++LteHelper::SetCellIdCounter (uint16_t base)
++{
++  m_cellIdCounter = base;
++}
++
+ void 
+ LteHelper::SetSchedulerType (std::string type) 
+ {
+@@ -565,11 +575,20 @@ LteHelper::InstallSingleEnbDevice (Ptr<N
+       NS_LOG_INFO ("adding this eNB to the EPC");
+       m_epcHelper->AddEnb (n, dev, dev->GetCellId ());
+       Ptr<EpcEnbApplication> enbApp = n->GetApplication (0)->GetObject<EpcEnbApplication> ();
+-      NS_ASSERT_MSG (enbApp != 0, "cannot retrieve EpcEnbApplication");
++      Ptr<TapEpcEnbApplication> tapEnbApp = n->GetApplication (0)->GetObject<TapEpcEnbApplication> ();
++      NS_ASSERT_MSG (enbApp != 0 || tapEnbApp != 0, "cannot retrieve EpcEnbApplication");
+ 
+       // S1 SAPs
+-      rrc->SetS1SapProvider (enbApp->GetS1SapProvider ());
+-      enbApp->SetS1SapUser (rrc->GetS1SapUser ());
++      if (enbApp != 0)
++        {
++          rrc->SetS1SapProvider (enbApp->GetS1SapProvider ());
++          enbApp->SetS1SapUser (rrc->GetS1SapUser ());
++        }
++      else
++        {
++          rrc->SetS1SapProvider (tapEnbApp->GetS1SapProvider ());
++          tapEnbApp->SetS1SapUser (rrc->GetS1SapUser ());
++        }
+ 
+       // X2 SAPs
+       Ptr<EpcX2> x2 = n->GetObject<EpcX2> ();
+@@ -845,6 +864,18 @@ LteHelper::ActivateDedicatedEpsBearer (P
+   return bearerId;
+ }
+ 
++uint8_t
++LteHelper::ActivateDedicatedEpsBearer (Ptr<NetDevice> ueDevice, EpsBearer bearer, EpcTft tft)
++{
++  NS_LOG_FUNCTION (this);
++
++  NS_ASSERT_MSG (m_epcHelper != 0, "dedicated EPS bearers cannot be set up when the EPC is not used");
++
++  uint64_t imsi = ueDevice->GetObject<LteUeNetDevice> ()->GetImsi ();
++  uint8_t bearerId = m_epcHelper->ActivateEpsBearer (ueDevice, imsi, &tft, bearer);
++  return bearerId;
++}
++
+ /**
+  * \ingroup lte
+  *
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/helper/lte-helper.h ns-3.22/src/lte/helper/lte-helper.h
+--- ns-3.22-backup/src/lte/helper/lte-helper.h	2015-02-06 07:46:23.000000000 +0800
++++ ns-3.22/src/lte/helper/lte-helper.h	2016-10-10 22:48:30.416415077 +0800
+@@ -121,6 +121,10 @@ public:
+    */
+   void SetEpcHelper (Ptr<EpcHelper> h);
+ 
++  void SetImsiCounter (uint64_t base);
++
++  void SetCellIdCounter (uint16_t base);
++
+   /** 
+    * Set the type of path loss model to be used for both DL and UL channels.
+    * 
+@@ -413,6 +417,8 @@ public:
+    */
+   uint8_t ActivateDedicatedEpsBearer (Ptr<NetDevice> ueDevice, EpsBearer bearer, Ptr<EpcTft> tft);
+ 
++  uint8_t ActivateDedicatedEpsBearer (Ptr<NetDevice> ueDevice, EpsBearer bearer, EpcTft tft);
++
+   /**
+    *  \brief Manually trigger dedicated bearer de-activation at specific simulation time
+    *  \param ueDevice the UE on which dedicated bearer to be de-activated must be of the type LteUeNetDevice
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/helper/tap-epc-helper.cc ns-3.22/src/lte/helper/tap-epc-helper.cc
+--- ns-3.22-backup/src/lte/helper/tap-epc-helper.cc	1970-01-01 08:00:00.000000000 +0800
++++ ns-3.22/src/lte/helper/tap-epc-helper.cc	2016-09-22 23:09:33.041597417 +0800
+@@ -0,0 +1,867 @@
++/* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
++/*
++ * Copyright (c) 2011-2013 Centre Tecnologic de Telecomunicacions de Catalunya (CTTC)
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation;
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ * Author: Jaume Nin <jnin@cttc.es>
++ *         Nicola Baldo <nbaldo@cttc.es>
++ *         Manuel Requena <manuel.requena@cttc.es>
++ */
++
++#include <ns3/tap-epc-helper.h>
++#include <ns3/epc-helper-header.h>
++#include <ns3/log.h>
++#include <ns3/inet-socket-address.h>
++#include <ns3/mac48-address.h>
++#include <ns3/arp-cache.h>
++#include <ns3/eps-bearer.h>
++#include <ns3/ipv4-address.h>
++#include <ns3/ipv4-interface.h>
++#include <ns3/internet-stack-helper.h>
++#include <ns3/packet-socket-helper.h>
++#include <ns3/packet-socket-address.h>
++#include <ns3/tap-epc-enb-application.h>
++#include <ns3/epc-sgw-pgw-application.h>
++#include <ns3/tap-fd-net-device-helper.h>
++#include <ns3/callback.h>
++
++#include <ns3/lte-enb-rrc.h>
++#include <ns3/epc-x2.h>
++#include <ns3/lte-enb-net-device.h>
++#include <ns3/lte-ue-net-device.h>
++#include <ns3/tap-epc-mme.h>
++#include <ns3/epc-s1ap-header.h>
++#include <ns3/epc-s1ap-sap.h>
++#include <ns3/epc-ue-nas.h>
++#include <ns3/string.h>
++#include <ns3/enum.h>
++#include <ns3/uinteger.h>
++#include <ns3/abort.h>
++
++#include <iomanip>
++#include <iostream>
++#include <fstream>
++#include <sstream>
++
++namespace ns3 {
++
++NS_LOG_COMPONENT_DEFINE ("TapEpcHelper");
++
++NS_OBJECT_ENSURE_REGISTERED (TapEpcHelper);
++
++TapEpcHelper::TapEpcHelper () 
++  : m_gtpuUdpPort (2152),  // fixed by the standard
++    m_s1apTcpPort (36412),
++    m_masterTcpPort (36413)
++{
++  m_scheduleTime = Seconds (0.0);
++  NS_LOG_FUNCTION (this);
++}
++
++TapEpcHelper::~TapEpcHelper ()
++{
++  NS_LOG_FUNCTION (this);
++}
++
++TypeId
++TapEpcHelper::GetTypeId (void)
++{
++  static TypeId tid = TypeId ("ns3::TapEpcHelper")
++    .SetParent<EpcHelper> ()
++    .AddConstructor<TapEpcHelper> ()
++    .AddAttribute ("SgwDeviceName",
++                   "The name of the device used for the S1-U interface of the SGW",
++                   StringValue ("sgwTap"),
++                   MakeStringAccessor (&TapEpcHelper::m_sgwDeviceName),
++                   MakeStringChecker ())
++    .AddAttribute ("EnbDeviceName",
++                   "The name of the device used for the S1-U interface of the eNB",
++                   StringValue ("enbTap"),
++                   MakeStringAccessor (&TapEpcHelper::m_enbDeviceName),
++                   MakeStringChecker ())
++    .AddAttribute ("MmeDeviceName",
++                   "The name of the device used for the S1-AP interface of the MME",
++                   StringValue ("mmeTap"),
++                   MakeStringAccessor (&TapEpcHelper::m_mmeDeviceName),
++                   MakeStringChecker ())
++    .AddAttribute ("MasterDeviceName",
++                   "The name of the device used for Master",
++                   StringValue ("masterTap"),
++                   MakeStringAccessor (&TapEpcHelper::m_masterDeviceName),
++                   MakeStringChecker ())
++    .AddAttribute ("EpcSlaveDeviceName",
++                   "The name of the device used for Slave",
++                   StringValue ("slaveTap"),
++                   MakeStringAccessor (&TapEpcHelper::m_slaveDeviceName),
++                   MakeStringChecker ())
++    .AddAttribute ("Mode",
++                   "The operating mode to use",
++                   EnumValue (Master),
++                   MakeEnumAccessor (&TapEpcHelper::m_mode),
++                   MakeEnumChecker (Master, "Master",
++                                    Slave, "Slave"))
++    .AddAttribute ("MasterUeIpAddressBase",
++                   "The base of master mode UE IP address",
++                   StringValue ("0.0.0.1"),
++                   MakeStringAccessor (&TapEpcHelper::m_masterUeIpAddressBase),
++                   MakeStringChecker ())
++    .AddAttribute ("SlaveUeIpAddressBase",
++                   "The base of slave mode UE IP address",
++                   StringValue ("0.0.1.1"),
++                   MakeStringAccessor (&TapEpcHelper::m_slaveUeIpAddressBase),
++                   MakeStringChecker ())
++    .AddAttribute ("MasterIpAddressBase",
++                   "The base of master mode IP address",
++                   StringValue ("0.0.0.1"),
++                   MakeStringAccessor (&TapEpcHelper::m_masterIpAddressBase),
++                   MakeStringChecker ())
++    .AddAttribute ("SlaveIpAddressBase",
++                   "The base of slave mode IP address",
++                   StringValue ("0.0.1.1"),
++                   MakeStringAccessor (&TapEpcHelper::m_slaveIpAddressBase),
++                   MakeStringChecker ())
++    .AddAttribute ("TunMacAddress", 
++                   "MAC address used for the TUN",
++                   StringValue ("00:00:00:59:00:aa"),
++                   MakeStringAccessor (&TapEpcHelper::m_tunMacAddress),
++                   MakeStringChecker ())
++    .AddAttribute ("SgwMacAddress", 
++                   "MAC address used for the SGW",
++                   StringValue ("00:00:00:59:00:ab"),
++                   MakeStringAccessor (&TapEpcHelper::m_sgwMacAddress),
++                   MakeStringChecker ())
++    .AddAttribute ("MmeMacAddress", 
++                   "MAC address used for the MME",
++                   StringValue ("00:00:00:59:00:ac"),
++                   MakeStringAccessor (&TapEpcHelper::m_mmeMacAddress),
++                   MakeStringChecker ())
++    .AddAttribute ("MasterMacAddress", 
++                   "MAC address used for the Master",
++                   StringValue ("00:00:00:59:00:ad"),
++                   MakeStringAccessor (&TapEpcHelper::m_masterMacAddress),
++                   MakeStringChecker ())
++    .AddAttribute ("LogFile",
++                   "Set this attribute to redirect NS_LOG to std::ofstream",
++                   StringValue (""),
++                   MakeStringAccessor (&TapEpcHelper::m_logFile),
++                   MakeStringChecker ())
++    ;
++  return tid;
++}
++
++void
++TapEpcHelper::DoInitialize ()
++{
++  
++  if (m_logFile.compare ("") != 0)
++    {
++      const unsigned int length = 8192;
++      char buffer[length];
++      m_fileStream.open (m_logFile.c_str ());
++      m_fileStream.rdbuf()->pubsetbuf(buffer, length);
++      std::clog.rdbuf (m_fileStream.rdbuf ());
++      std::cerr.rdbuf (m_fileStream.rdbuf ());
++    }
++
++  if (m_mode == Master)
++    {
++      MasterInitialize ();
++    }
++  else if (m_mode == Slave)
++    {
++      SlaveInitialize ();
++    }
++}
++
++void
++TapEpcHelper::MasterInitialize ()
++{
++  int retval;
++
++  // we use a /8 net for all UEs
++  m_ueAddressHelper.SetBase ("7.0.0.0", "255.0.0.0", m_masterUeIpAddressBase.c_str ());
++  
++  InternetStackHelper internet;
++  internet.SetIpv6StackInstall (false);
++  
++  // create SgwPgwNode
++  m_sgwPgw = CreateObject<Node> ();
++  internet.Install (m_sgwPgw);
++  
++  // create MmeNode
++  m_mmeNode = CreateObject<Node> ();
++  internet.Install (m_mmeNode);
++
++  m_master = CreateObject<Node> ();
++  internet.Install (m_master);
++  
++  // create TUN device implementing tunneling of user data over GTP-U/UDP/IP
++  m_tunDevice = CreateObject<VirtualNetDevice> ();
++  // allow jumbo packets
++  m_tunDevice->SetAttribute ("Mtu", UintegerValue (30000));
++
++  // allocate a Mac48Address for TUN device
++  m_tunDevice->SetAddress (Mac48Address (m_tunMacAddress.c_str ()));
++  NS_LOG_LOGIC ("MAC address of TUN device: " << m_tunMacAddress.c_str());
++  m_ueDefaultGatewayMacAddress = m_tunMacAddress;
++
++  m_sgwPgw->AddDevice (m_tunDevice);
++  NetDeviceContainer tunDeviceContainer;
++  tunDeviceContainer.Add (m_tunDevice);
++  
++  // the TUN device is on the same subnet as the UEs, so when a packet
++  // addressed to an UE arrives at the intenet to the WAN interface of
++  // the PGW it will be forwarded to the TUN device.
++  Ipv4InterfaceContainer tunDeviceIpv4IfContainer = m_ueAddressHelper.Assign (tunDeviceContainer);
++  NS_LOG_LOGIC ("IP address of TUN device: " << tunDeviceIpv4IfContainer.GetAddress (0));
++  m_ueDefaultGatewayAddress = tunDeviceIpv4IfContainer.GetAddress (0);
++  
++  // create TapFdNetDevice for SGW
++  TapFdNetDeviceHelper tap;
++  NS_LOG_LOGIC ("SGW device: " << m_sgwDeviceName);
++  tap.SetDeviceName (m_sgwDeviceName);
++  tap.SetTapMacAddress (Mac48Address (m_sgwMacAddress.c_str ()));
++  tap.SetDscpMarking (FdNetDevice::MarkDscp);
++  NetDeviceContainer sgwDevices = tap.Install (m_sgwPgw);
++  sgwDevices.Get (0)->SetAddress (Mac48Address (m_sgwMacAddress.c_str ()));
++  NS_LOG_LOGIC ("MAC address of SGW: " << sgwDevices.Get (0)->GetAddress ());
++  
++  // create TapFdNetDevice for MME
++  NS_LOG_LOGIC ("MME device: " << m_mmeDeviceName);
++  tap.SetDeviceName (m_mmeDeviceName);
++  tap.SetTapMacAddress (Mac48Address (m_mmeMacAddress.c_str ()));
++  NetDeviceContainer mmeDevices = tap.Install (m_mmeNode);
++  mmeDevices.Get (0)->SetAddress (Mac48Address (m_mmeMacAddress.c_str ()));
++  NS_LOG_LOGIC ("MAC address of MME: " << mmeDevices.Get (0)->GetAddress ());
++  
++  // create TapFdNetDevice for EpcMaster
++  NS_LOG_LOGIC ("Master device: " << m_masterDeviceName);
++  tap.SetDeviceName (m_masterDeviceName);
++  tap.SetTapMacAddress (Mac48Address (m_masterMacAddress.c_str()));
++  NetDeviceContainer masterDevices = tap.Install (m_master);
++  masterDevices.Get (0)->SetAddress (Mac48Address (m_masterMacAddress.c_str ()));
++  NS_LOG_LOGIC ("MAC address of Master: " << masterDevices.Get (0)->GetAddress ());
++  
++  // we use a /8 subnet so the SGW and the eNBs can talk directly to each other
++  m_epcIpv4AddressHelper.SetBase ("10.0.0.0", "255.255.0.0", m_masterIpAddressBase.c_str ());
++  Ipv4InterfaceContainer sgwIpIfaces = m_epcIpv4AddressHelper.Assign (sgwDevices.Get (0));
++  m_sgwIpv4Address = sgwIpIfaces.GetAddress (0);
++  NS_LOG_LOGIC ("IP address of SGW: " << m_sgwIpv4Address);
++  Ipv4InterfaceContainer mmeIpIfaces = m_epcIpv4AddressHelper.Assign (mmeDevices.Get (0));
++  m_mmeIpv4Address = mmeIpIfaces.GetAddress (0);
++  NS_LOG_LOGIC ("IP address of MME: " << m_mmeIpv4Address);
++  Ipv4InterfaceContainer masterIpIfaces = m_epcIpv4AddressHelper.Assign (masterDevices.Get (0));
++  m_masterIpv4Address = masterIpIfaces.GetAddress (0);
++  NS_LOG_LOGIC ("IP address of EpcMaster: " << m_masterIpv4Address);
++  // m_epcIpv4AddressHelper.SetBase ("10.0.0.0", "255.0.0.0", "0.0.0.101");
++  
++  // create S1-U socket
++  Ptr<Socket> sgwPgwS1uSocket = Socket::CreateSocket (m_sgwPgw, TypeId::LookupByName ("ns3::UdpSocketFactory"));
++  retval = sgwPgwS1uSocket->Bind (InetSocketAddress (Ipv4Address::GetAny (), m_gtpuUdpPort));
++  NS_ASSERT (retval == 0);
++  
++  // create S1-AP socket
++  Ptr<Socket> mmeS1apSocket = Socket::CreateSocket (m_mmeNode, TypeId::LookupByName ("ns3::TcpSocketFactory"));
++  retval = mmeS1apSocket->Bind (InetSocketAddress (Ipv4Address::GetAny (), m_s1apTcpPort));
++  NS_ASSERT (retval == 0);
++  mmeS1apSocket->Listen ();
++  mmeS1apSocket->SetAcceptCallback (MakeNullCallback<bool, Ptr<Socket>, const Address &> (),
++                                    MakeCallback (&TapEpcHelper::HandleS1apConnection, this));
++                                    
++  // create EpcMaster socket
++  Ptr<Socket> masterSocket = Socket::CreateSocket (m_master, TypeId::LookupByName ("ns3::TcpSocketFactory"));
++  retval = masterSocket->Bind (InetSocketAddress (Ipv4Address::GetAny (), m_masterTcpPort));
++  NS_ASSERT (retval == 0);
++  masterSocket->Listen ();
++  masterSocket->SetAcceptCallback (MakeNullCallback<bool, Ptr<Socket>, const Address &> (),
++                                   MakeCallback (&TapEpcHelper::HandleMasterConnection, this));
++
++  // create EpcSgwPgwApplication
++  m_sgwPgwApp = CreateObject<EpcSgwPgwApplication> (m_tunDevice, sgwPgwS1uSocket);
++  m_sgwPgw->AddApplication (m_sgwPgwApp);
++  
++  // connect SgwPgwApplication and virtual net device for tunneling
++  m_tunDevice->SetSendCallback (MakeCallback (&EpcSgwPgwApplication::RecvFromTunDevice, m_sgwPgwApp));
++  
++  // create MME and connect with SGW via S11 interface
++  m_mme = CreateObject<TapEpcMme> ();
++  m_mme->SetS11SapSgw (m_sgwPgwApp->GetS11SapSgw ());
++  m_sgwPgwApp->SetS11SapMme (m_mme->GetS11SapMme ());
++  
++  EpcHelper::DoInitialize ();
++}
++
++void
++TapEpcHelper::SlaveInitialize ()
++{
++  
++  // we use a /8 net for all UEs
++  m_ueAddressHelper.SetBase ("7.0.0.0", "255.0.0.0", m_masterUeIpAddressBase.c_str ());
++  m_ueDefaultGatewayAddress = m_ueAddressHelper.NewAddress ();
++  m_ueAddressHelper.SetBase ("7.0.0.0", "255.0.0.0", m_slaveUeIpAddressBase.c_str ());
++  
++  m_epcIpv4AddressHelper.SetBase ("10.0.0.0", "255.255.0.0", m_masterIpAddressBase.c_str ());
++  m_sgwIpv4Address = m_epcIpv4AddressHelper.NewAddress ();
++  NS_LOG_LOGIC ("IP address of SGW: " << m_sgwIpv4Address);
++  m_mmeIpv4Address = m_epcIpv4AddressHelper.NewAddress ();
++  NS_LOG_LOGIC ("IP address of MME: " << m_mmeIpv4Address);
++  m_masterIpv4Address = m_epcIpv4AddressHelper.NewAddress ();
++  NS_LOG_LOGIC ("IP address of EpcMaster: " << m_masterIpv4Address);
++  
++  m_ueDefaultGatewayMacAddress = m_tunMacAddress;
++  
++  InternetStackHelper internet;
++  internet.SetIpv6StackInstall (false);
++
++  m_slave = CreateObject<Node> ();
++  internet.Install (m_slave);
++  
++  // create TapFdNetDevice for EpcSlave
++  NS_LOG_LOGIC ("EpcSlave device: " << m_slaveDeviceName);
++  TapFdNetDeviceHelper tap;
++  tap.SetDeviceName (m_slaveDeviceName);
++  uint64_t key = 0;
++  for (const char *base = m_slaveIpAddressBase.c_str (); *base != '\0'; ++base)
++    {
++      key = key + *base;
++    }
++  tap.SetTapMacAddress (TapEpcHelper::AllocateMac48Address (static_cast<uint64_t> (key)));
++  NetDeviceContainer slaveDevices = tap.Install (m_slave);
++  slaveDevices.Get (0)->SetAddress (TapEpcHelper::AllocateMac48Address (static_cast<uint64_t> (key)));
++  
++  m_epcIpv4AddressHelper.SetBase ("10.0.0.0", "255.255.0.0", m_slaveIpAddressBase.c_str ());
++  Ipv4InterfaceContainer slaveIpIfaces = m_epcIpv4AddressHelper.Assign (slaveDevices.Get (0));
++  
++  NS_LOG_LOGIC ("IP address of Slave: " << slaveIpIfaces.GetAddress (0));
++
++  // create EpcSlave socket
++  m_slaveSocket = Socket::CreateSocket (m_slave, TypeId::LookupByName ("ns3::TcpSocketFactory"));
++  int retval = m_slaveSocket->Connect (InetSocketAddress (m_masterIpv4Address, m_masterTcpPort));
++  NS_ASSERT (retval == 0);
++  m_slaveSocket->SetRecvCallback (MakeCallback (&TapEpcHelper::RecvFromSlaveSocket, this));
++  
++  m_slaveMme = CreateObject<TapEpcMme> ();
++
++  EpcHelper::DoInitialize ();
++}
++
++void
++TapEpcHelper::HandleS1apConnection (Ptr<Socket> socket, const Address &addr)
++{
++  NS_LOG_FUNCTION (this << socket << addr);
++  m_mme->AddS1apSocket (addr, socket);
++  socket->SetRecvCallback (MakeCallback (&TapEpcHelper::RecvFromS1apSocket, this));
++}
++
++void
++TapEpcHelper::RecvFromSlaveSocket (Ptr<Socket> socket)
++{
++  Ptr<Packet> packet = socket->Recv ();
++  
++  EpcHelperHeader epcHelperHeader;
++  packet->RemoveHeader (epcHelperHeader);
++  
++  uint8_t procedureCode = epcHelperHeader.GetProcedureCode ();
++  uint8_t typeOfMessage = epcHelperHeader.GetTypeOfMessage ();
++  
++  if (procedureCode == EpcHelperHeader::ActivateEpsBearer)
++    {
++      if (typeOfMessage == EpcHelperHeader::SuccessfulOutcome)
++        {
++          NS_LOG_LOGIC ("TapEpcHelper::RecvFromSlaveSocket ActivateEpsBearerResponse");
++          ActivateEpsBearerResponseHeader activateEpsBearerResponseHeader;
++          packet->RemoveHeader (activateEpsBearerResponseHeader);
++          uint8_t bearerId = activateEpsBearerResponseHeader.GetBearerId ();
++          NS_LOG_LOGIC ("bearerId = " << (int) bearerId);
++        }
++    }
++}
++
++void
++TapEpcHelper::SendToSlaveSocket (Ptr<Packet> packet)
++{
++  if (Simulator::Now () == Seconds (0.0))
++    {
++      Simulator::Schedule (m_scheduleTime, static_cast<int (Socket::*)(Ptr<Packet>)>(&Socket::Send), m_slaveSocket, packet);
++      m_scheduleTime = m_scheduleTime + Seconds (0.1);
++    }
++  else
++    {
++      Simulator::ScheduleNow (static_cast<int (Socket::*)(Ptr<Packet>)>(&Socket::Send), m_slaveSocket, packet);
++    }
++}
++
++void
++TapEpcHelper::RecvFromMasterSocket (Ptr<Socket> socket)
++{
++  Ptr<Packet> packet = socket->Recv ();
++  HandleMasterPacket (socket, packet);
++}
++
++void
++TapEpcHelper::HandleMasterConnection (Ptr<Socket> socket, const Address &addr)
++{
++  socket->SetRecvCallback (MakeCallback (&TapEpcHelper::RecvFromMasterSocket, this));
++}
++
++void
++TapEpcHelper::HandleMasterPacket (Ptr<Socket> socket, Ptr<Packet> packet)
++{
++  NS_LOG_LOGIC ("TapEpcHelper::HandleMasterPacket packet->GetSize ():" << packet->GetSize ());
++  EpcHelperHeader epcHelperHeader;
++  packet->RemoveHeader (epcHelperHeader);
++  
++  uint8_t procedureCode = epcHelperHeader.GetProcedureCode ();
++  uint8_t typeOfMessage = epcHelperHeader.GetTypeOfMessage ();
++  
++  if (procedureCode == EpcHelperHeader::AddUe)
++    {
++      if (typeOfMessage == EpcHelperHeader::InitiatingMessage)
++        {
++          NS_LOG_LOGIC ("TapEpcHelper::HandleMasterPacket AddUeRequest");
++          AddUeRequestHeader addUeRequestHeader;
++          packet->RemoveHeader (addUeRequestHeader);
++          
++          uint64_t imsi = addUeRequestHeader.GetImsi ();
++          m_mme->AddUe (imsi);
++          m_sgwPgwApp->AddUe (imsi);
++        }
++    }
++  else if (procedureCode == EpcHelperHeader::AddEnb)
++    {
++      if (typeOfMessage == EpcHelperHeader::InitiatingMessage)
++        {
++          NS_LOG_LOGIC ("TapEpcHelper::HandleMasterPacket AddEnbRequest");
++          AddEnbRequestHeader addEnbRequestHeader;
++          packet->RemoveHeader (addEnbRequestHeader);
++          
++          uint16_t cellId = addEnbRequestHeader.GetCellId ();
++          Ipv4Address enbAddress = addEnbRequestHeader.GetEnbAddress ();
++          Ipv4Address sgwAddress = addEnbRequestHeader.GetSgwAddress ();
++      
++          m_mme->AddEnb (cellId, enbAddress, enbAddress);
++          m_sgwPgwApp->AddEnb (cellId, enbAddress, sgwAddress);
++        }
++    }
++  else if (procedureCode == EpcHelperHeader::ActivateEpsBearer)
++    {
++      if (typeOfMessage == EpcHelperHeader::InitiatingMessage)
++        {
++          NS_LOG_LOGIC ("TapEpcHelper::HandleMasterPacket ActivateEpsBearerRequest");
++          ActivateEpsBearerRequestHeader activateEpsBearerRequestHeader;
++          packet->RemoveHeader (activateEpsBearerRequestHeader);
++          
++          uint64_t imsi = activateEpsBearerRequestHeader.GetImsi ();
++          Ipv4Address ueAddr = activateEpsBearerRequestHeader.GetUeAddress ();
++          EpcTft epcTft = activateEpsBearerRequestHeader.GetEpcTft ();
++          EpsBearer bearer = activateEpsBearerRequestHeader.GetEpsBearer ();
++          
++          Ptr<EpcTft> tft = Create<EpcTft> (epcTft);
++          NS_LOG_LOGIC ("imsi = " << imsi << " ueAddr = " << ueAddr);
++          m_sgwPgwApp->SetUeAddress (imsi, ueAddr);
++          uint8_t bearerId = m_mme->AddBearer (imsi, tft, bearer);
++          NS_LOG_LOGIC ("bearerId = " << (int) bearerId);
++          
++          epcHelperHeader.SetProcedureCode (EpcHelperHeader::ActivateEpsBearer);
++          epcHelperHeader.SetTypeOfMessage (EpcHelperHeader::SuccessfulOutcome);
++
++          ActivateEpsBearerResponseHeader activateEpsBearerResponseHeader;
++          activateEpsBearerResponseHeader.SetBearerId (bearerId);
++
++          Ptr<Packet> responsePacket = Create<Packet> ();
++          responsePacket->AddHeader (activateEpsBearerResponseHeader);
++          responsePacket->AddHeader (epcHelperHeader);
++
++          socket->Send (responsePacket);
++        }
++    }
++    
++  if (packet->GetSize () != 0)
++    {
++      HandleMasterPacket (socket, packet);
++    }
++}
++
++void
++TapEpcHelper::RecvFromS1apSocket (Ptr<Socket> socket)
++{
++  Ptr<Packet> packet = socket->Recv ();
++  HandleS1apPacket (socket, packet);
++}
++
++void
++TapEpcHelper::HandleS1apPacket (Ptr<Socket> socket, Ptr<Packet> packet)
++{
++  EpcS1apHeader EpcS1apHeader;
++  packet->RemoveHeader (EpcS1apHeader);
++  
++  uint8_t procedureCode = EpcS1apHeader.GetProcedureCode ();
++  uint8_t typeOfMessage = EpcS1apHeader.GetTypeOfMessage ();
++  
++  if (procedureCode == EpcS1apHeader::InitialUeMessage)
++    {
++      if (typeOfMessage == EpcS1apHeader::InitiatingMessage)
++        {
++          NS_LOG_LOGIC ("TapEpcHelper::HandleS1apPacket InitialUeMessage");
++          InitialUeRequestHeader initialUeRequestHeader;
++          packet->RemoveHeader (initialUeRequestHeader);
++          
++          uint64_t mmeUeS1Id = initialUeRequestHeader.GetMmeUeS1Id ();
++          uint16_t enbUeS1Id = initialUeRequestHeader.GetEnbUeS1Id ();
++          uint64_t imsi = initialUeRequestHeader.GetStmsi ();
++          uint16_t ecgi = initialUeRequestHeader.GetEcgi ();
++          
++          m_mme->InitialUeMessage (mmeUeS1Id, enbUeS1Id, imsi, ecgi);
++        }
++    }
++  else if (procedureCode == EpcS1apHeader::PathSwitchRequest)
++    {
++      if (typeOfMessage == EpcS1apHeader::InitiatingMessage)
++        {
++          NS_LOG_LOGIC ("TapEpcHelper::HandleS1apPacket PathSwitchRequest");
++          PathSwitchRequestHeader pathSwitchRequestHeader;
++          packet->RemoveHeader (pathSwitchRequestHeader);
++          
++          uint64_t enbUeS1Id = pathSwitchRequestHeader.GetEnbUeS1Id ();
++          uint64_t mmeUeS1Id = pathSwitchRequestHeader.GetMmeUeS1Id ();
++          uint16_t cgi = pathSwitchRequestHeader.GetCgi ();
++          
++          std::list<EpcS1apSapMme::ErabSwitchedInDownlinkItem> erabToBeSwitchedInDownlinkList;
++          erabToBeSwitchedInDownlinkList = pathSwitchRequestHeader.GetErabToBeSwitchedInDownlinkList ();
++          
++          m_mme->PathSwitchRequest (enbUeS1Id, mmeUeS1Id, cgi, erabToBeSwitchedInDownlinkList);
++        }
++    }
++  else if (procedureCode == EpcS1apHeader::ErabRelease)
++    {
++      if (typeOfMessage == EpcS1apHeader::InitiatingMessage)
++        {
++          NS_LOG_LOGIC ("TapEpcHelper::HandleS1apPacket ErabRelease");
++          ErabReleaseIndicationHeader erabReleaseIndicationHeader;
++          packet->RemoveHeader (erabReleaseIndicationHeader);
++          
++          uint64_t imsi = erabReleaseIndicationHeader.GetMmeUeS1Id ();
++          uint16_t rnti = erabReleaseIndicationHeader.GetEnbUeS1Id ();
++          
++          std::list<EpcS1apSapMme::ErabToBeReleasedIndication> erabToBeReleaseIndication;
++          erabToBeReleaseIndication =  erabReleaseIndicationHeader.GetErabToBeReleaseIndication ();
++          
++          m_mme->ErabReleaseIndication (imsi, rnti, erabToBeReleaseIndication);
++        }
++    }
++  
++  if (packet->GetSize () != 0)
++    {
++      HandleS1apPacket (socket, packet);
++    }
++}
++
++void
++TapEpcHelper::DoDispose ()
++{
++  NS_LOG_FUNCTION (this);
++  m_tunDevice->SetSendCallback (MakeNullCallback<bool, Ptr<Packet>, const Address &, const Address &, uint16_t> ());
++  m_tunDevice = 0;
++  m_sgwPgwApp = 0;  
++  m_sgwPgw->Dispose ();
++  if (m_logFile.compare ("") != 0)
++    {
++      m_fileStream.close ();
++    }
++}
++
++void
++TapEpcHelper::AddEnb (Ptr<Node> enb, Ptr<NetDevice> lteEnbNetDevice, uint16_t cellId)
++{
++  NS_LOG_FUNCTION (this << enb << lteEnbNetDevice << cellId);
++
++  Initialize ();
++
++  NS_ASSERT (enb == lteEnbNetDevice->GetNode ());  
++
++  // add an IPv4 stack to the previously created eNB
++  InternetStackHelper internet;
++  internet.SetIpv6StackInstall (false);
++  internet.Install (enb);
++  
++  // create an TapFdNetDevice for the eNB to connect with the SGW and other eNBs
++  std::ostringstream enbDevNameWithCount;
++  enbDevNameWithCount << m_enbDeviceName << cellId;
++  TapFdNetDeviceHelper tap;
++  NS_LOG_LOGIC ("eNB device: " << enbDevNameWithCount.str());
++  tap.SetDeviceName (enbDevNameWithCount.str());
++  tap.SetTapMacAddress (TapEpcHelper::AllocateMac48Address (static_cast<uint64_t> (cellId)));
++  tap.SetDscpMarking (FdNetDevice::MarkDscp);
++  NetDeviceContainer enbDevices = tap.Install (enb);
++  enbDevices.Get (0)->SetAddress (TapEpcHelper::AllocateMac48Address (static_cast<uint64_t> (cellId)));
++  NS_LOG_LOGIC ("MAC address of eNB: " << enbDevices.Get (0)->GetAddress ());
++
++  Ipv4InterfaceContainer enbIpIfaces = m_epcIpv4AddressHelper.Assign (enbDevices.Get (0));
++  Ipv4Address enbAddress = enbIpIfaces.GetAddress (0);
++  NS_LOG_LOGIC ("IP address of eNB: " << enbAddress);
++  
++  // setup ARP cache
++  NS_LOG_LOGIC ("Number of IPv4 Interfaces on eNB: " << enb->GetObject<Ipv4L3Protocol> ()->GetNInterfaces ());
++  Ptr<Ipv4Interface> ipIface = enb->GetObject<Ipv4L3Protocol> ()->GetInterface (1);
++  Ptr<ArpCache> arpCache = CreateObject<ArpCache> ();
++  arpCache->SetAliveTimeout (Seconds(3600 * 24));
++  
++  ArpCache::Entry *entry = arpCache->Add (m_sgwIpv4Address);
++  entry->MarkWaitReply (0);
++  entry->MarkAlive (Mac48Address (m_sgwMacAddress.c_str ()));
++  
++  entry = arpCache->Add (m_mmeIpv4Address);
++  entry->MarkWaitReply(0);
++  entry->MarkAlive (Mac48Address (m_mmeMacAddress.c_str ()));
++  
++  entry = arpCache->Add (m_masterIpv4Address);
++  entry->MarkWaitReply (0);
++  entry->MarkAlive (Mac48Address (m_masterMacAddress.c_str ()));
++  
++  ipIface->SetArpCache (arpCache);
++  
++  // create S1-U socket for the ENB
++  Ptr<Socket> enbS1uSocket = Socket::CreateSocket (enb, TypeId::LookupByName ("ns3::UdpSocketFactory"));
++  int retval = enbS1uSocket->Bind (InetSocketAddress (enbAddress, m_gtpuUdpPort));
++  NS_ASSERT (retval == 0);
++  
++  // create S1-AP socket for the ENB
++  Ptr<Socket> enbS1apSocket = Socket::CreateSocket (enb, TypeId::LookupByName ("ns3::TcpSocketFactory"));
++  retval = enbS1apSocket->Connect (InetSocketAddress (m_mmeIpv4Address, m_s1apTcpPort));
++  NS_ASSERT (retval == 0);
++    
++  // create LTE socket for the ENB 
++  Ptr<Socket> enbLteSocket = Socket::CreateSocket (enb, TypeId::LookupByName ("ns3::PacketSocketFactory"));
++  PacketSocketAddress enbLteSocketBindAddress;
++  enbLteSocketBindAddress.SetSingleDevice (lteEnbNetDevice->GetIfIndex ());
++  enbLteSocketBindAddress.SetProtocol (Ipv4L3Protocol::PROT_NUMBER);
++  retval = enbLteSocket->Bind (enbLteSocketBindAddress);
++  NS_ASSERT (retval == 0);  
++  PacketSocketAddress enbLteSocketConnectAddress;
++  enbLteSocketConnectAddress.SetPhysicalAddress (Mac48Address::GetBroadcast ());
++  enbLteSocketConnectAddress.SetSingleDevice (lteEnbNetDevice->GetIfIndex ());
++  enbLteSocketConnectAddress.SetProtocol (Ipv4L3Protocol::PROT_NUMBER);
++  retval = enbLteSocket->Connect (enbLteSocketConnectAddress);
++  NS_ASSERT (retval == 0);
++  
++  NS_LOG_INFO ("Create EpcEnbApplication");
++  Ptr<TapEpcEnbApplication> enbApp = CreateObject<TapEpcEnbApplication> (enbLteSocket, enbS1uSocket, enbS1apSocket, enbAddress, m_sgwIpv4Address, cellId);
++  enb->AddApplication (enbApp);
++  NS_ASSERT (enb->GetNApplications () == 1);
++  NS_ASSERT_MSG (enb->GetApplication (0)->GetObject<TapEpcEnbApplication> () != 0, "cannot retrieve EpcEnbApplication");
++  NS_LOG_LOGIC ("enb: " << enb << ", enb->GetApplication (0): " << enb->GetApplication (0));
++
++  NS_LOG_INFO ("Create EpcX2 entity");
++  Ptr<EpcX2> x2 = CreateObject<EpcX2> ();
++  enb->AggregateObject (x2);
++
++  NS_LOG_INFO ("Connect S1-AP interface");
++  if (m_mode == Master)
++    {
++      m_mme->AddEnb (cellId, enbAddress, enbAddress);
++      m_sgwPgwApp->AddEnb (cellId, enbAddress, m_sgwIpv4Address);
++    }
++  else if(m_mode == Slave)
++    {
++      EpcHelperHeader epcHelperHeader;
++      epcHelperHeader.SetProcedureCode (EpcHelperHeader::AddEnb);
++      epcHelperHeader.SetTypeOfMessage (EpcHelperHeader::InitiatingMessage);
++    
++      AddEnbRequestHeader addEnbRequestHeader;
++      addEnbRequestHeader.SetCellId (cellId);
++      addEnbRequestHeader.SetEnbAddress (enbAddress);
++      addEnbRequestHeader.SetSgwAddress (m_sgwIpv4Address);
++      
++      Ptr<Packet> packet = Create<Packet> ();
++      packet->AddHeader (addEnbRequestHeader);
++      packet->AddHeader (epcHelperHeader);
++      SendToSlaveSocket (packet);
++    }
++}
++
++void
++TapEpcHelper::AddX2Interface (Ptr<Node> enb1, Ptr<Node> enb2)
++{
++  NS_LOG_FUNCTION (this << enb1 << enb2);
++
++  NS_LOG_WARN ("X2 support still untested");
++
++  // for X2, we reuse the same device and IP address of the S1-U interface
++  Ptr<Ipv4> enb1Ipv4 = enb1->GetObject<Ipv4> ();
++  Ptr<Ipv4> enb2Ipv4 = enb2->GetObject<Ipv4> ();
++  NS_LOG_LOGIC ("number of Ipv4 ifaces of the eNB #1: " << enb1Ipv4->GetNInterfaces ());
++  NS_LOG_LOGIC ("number of Ipv4 ifaces of the eNB #2: " << enb2Ipv4->GetNInterfaces ());
++  NS_LOG_LOGIC ("number of NetDevices of the eNB #1: " << enb1->GetNDevices ());
++  NS_LOG_LOGIC ("number of NetDevices of the eNB #2: " << enb2->GetNDevices ());
++
++  // 0 is the LTE device, 1 is localhost, 2 is the EPC NetDevice
++  Ptr<NetDevice> enb1EpcDev = enb1->GetDevice (2);
++  Ptr<NetDevice> enb2EpcDev = enb2->GetDevice (2);
++
++  int32_t enb1Interface =  enb1Ipv4->GetInterfaceForDevice (enb1EpcDev);
++  int32_t enb2Interface =  enb2Ipv4->GetInterfaceForDevice (enb2EpcDev);
++  NS_ASSERT (enb1Interface >= 0);
++  NS_ASSERT (enb2Interface >= 0);
++  NS_ASSERT (enb1Ipv4->GetNAddresses (enb1Interface) == 1);
++  NS_ASSERT (enb2Ipv4->GetNAddresses (enb2Interface) == 1);
++  Ipv4Address enb1Addr = enb1Ipv4->GetAddress (enb1Interface, 0).GetLocal (); 
++  Ipv4Address enb2Addr = enb2Ipv4->GetAddress (enb2Interface, 0).GetLocal (); 
++  NS_LOG_LOGIC (" eNB 1 IP address: " << enb1Addr); 
++  NS_LOG_LOGIC (" eNB 2 IP address: " << enb2Addr);
++  
++  // Add X2 interface to both eNBs' X2 entities
++  Ptr<EpcX2> enb1X2 = enb1->GetObject<EpcX2> ();
++  Ptr<LteEnbNetDevice> enb1LteDev = enb1->GetDevice (0)->GetObject<LteEnbNetDevice> ();
++  uint16_t enb1CellId = enb1LteDev->GetCellId ();
++  NS_LOG_LOGIC ("LteEnbNetDevice #1 = " << enb1LteDev << " - CellId = " << enb1CellId);
++
++  Ptr<EpcX2> enb2X2 = enb2->GetObject<EpcX2> ();
++  Ptr<LteEnbNetDevice> enb2LteDev = enb2->GetDevice (0)->GetObject<LteEnbNetDevice> ();
++  uint16_t enb2CellId = enb2LteDev->GetCellId ();
++  NS_LOG_LOGIC ("LteEnbNetDevice #2 = " << enb2LteDev << " - CellId = " << enb2CellId);
++
++  enb1X2->AddX2Interface (enb1CellId, enb1Addr, enb2CellId, enb2Addr);
++  enb2X2->AddX2Interface (enb2CellId, enb2Addr, enb1CellId, enb1Addr);
++
++  enb1LteDev->GetRrc ()->AddX2Neighbour (enb2LteDev->GetCellId ());
++  enb2LteDev->GetRrc ()->AddX2Neighbour (enb1LteDev->GetCellId ());
++}
++
++void 
++TapEpcHelper::AddUe (Ptr<NetDevice> ueDevice, uint64_t imsi)
++{
++  NS_LOG_FUNCTION (this << imsi << ueDevice);
++  
++  if (m_mode == Master)
++    {
++      m_mme->AddUe (imsi);
++      m_sgwPgwApp->AddUe (imsi);
++    }
++  else if(m_mode == Slave)
++    {
++      EpcHelperHeader epcHelperHeader;
++      epcHelperHeader.SetProcedureCode (EpcHelperHeader::AddUe);
++      epcHelperHeader.SetTypeOfMessage (EpcHelperHeader::InitiatingMessage);
++    
++      AddUeRequestHeader addUeRequestHeader;
++      addUeRequestHeader.SetImsi (imsi);
++      
++      Ptr<Packet> packet = Create<Packet> ();
++      packet->AddHeader (addUeRequestHeader);
++      packet->AddHeader (epcHelperHeader);
++      SendToSlaveSocket (packet);
++
++      m_slaveMme->AddUe (imsi);
++    }
++}
++
++uint8_t
++TapEpcHelper::ActivateEpsBearer (Ptr<NetDevice> ueDevice, uint64_t imsi, Ptr<EpcTft> tft, EpsBearer bearer)
++{
++  NS_LOG_FUNCTION (this << ueDevice << imsi);
++
++  // we now retrieve the IPv4 address of the UE and notify it to the SGW;
++  // we couldn't do it before since address assignment is triggered by
++  // the user simulation program, rather than done by the EPC   
++  Ptr<Node> ueNode = ueDevice->GetNode (); 
++  Ptr<Ipv4> ueIpv4 = ueNode->GetObject<Ipv4> ();
++  NS_ASSERT_MSG (ueIpv4 != 0, "UEs need to have IPv4 installed before EPS bearers can be activated");
++  int32_t interface =  ueIpv4->GetInterfaceForDevice (ueDevice);
++  NS_ASSERT (interface >= 0);
++  NS_ASSERT (ueIpv4->GetNAddresses (interface) == 1);
++  Ipv4Address ueAddr = ueIpv4->GetAddress (interface, 0).GetLocal ();
++  NS_LOG_LOGIC (" UE IP address: " << ueAddr);
++  
++  uint8_t bearerId = 0;
++  if (m_mode == Master)
++    {
++      m_sgwPgwApp->SetUeAddress (imsi, ueAddr);
++      bearerId = m_mme->AddBearer (imsi, tft, bearer);
++    }
++  else if(m_mode == Slave)
++    {
++      EpcTft epcTft = *tft;
++
++      EpcHelperHeader epcHelperHeader;
++      epcHelperHeader.SetProcedureCode (EpcHelperHeader::ActivateEpsBearer);
++      epcHelperHeader.SetTypeOfMessage (EpcHelperHeader::InitiatingMessage);
++
++      ActivateEpsBearerRequestHeader activateEpsBearerRequestHeader;
++      activateEpsBearerRequestHeader.SetImsi (imsi);
++      activateEpsBearerRequestHeader.SetUeAddress (ueAddr);
++      activateEpsBearerRequestHeader.SetEpcTft (epcTft);
++      activateEpsBearerRequestHeader.SetEpsBearer (bearer);
++
++      Ptr<Packet> packet = Create<Packet> ();
++      packet->AddHeader (activateEpsBearerRequestHeader);
++      packet->AddHeader (epcHelperHeader);
++      SendToSlaveSocket (packet);
++
++      bearerId = m_slaveMme->AddBearer (imsi, tft, bearer);
++    }
++  NS_ASSERT (bearerId != 0);
++  NS_LOG_LOGIC ("bearerId = " << (int) bearerId);
++
++  Ptr<LteUeNetDevice> ueLteDevice = ueDevice->GetObject<LteUeNetDevice> ();
++  if (ueLteDevice)
++    {
++      Simulator::ScheduleNow (&EpcUeNas::ActivateEpsBearer, ueLteDevice->GetNas (), bearer, tft);
++    }
++  return bearerId;
++}
++
++Ptr<Node>
++TapEpcHelper::GetPgwNode ()
++{
++  return m_sgwPgw;
++}
++
++Ipv4InterfaceContainer 
++TapEpcHelper::AssignUeIpv4Address (NetDeviceContainer ueDevices)
++{
++  return m_ueAddressHelper.Assign (ueDevices);
++}
++
++Ipv4Address
++TapEpcHelper::GetUeDefaultGatewayAddress ()
++{
++  // return the address of the tun device
++  return m_ueDefaultGatewayAddress;
++}
++
++Mac48Address
++TapEpcHelper::GetUeDefaultGatewayMacAddress ()
++{
++  return Mac48Address (m_ueDefaultGatewayMacAddress.c_str ());
++}
++
++Mac48Address
++TapEpcHelper::AllocateMac48Address (uint64_t key)
++{
++  uint8_t buffer[6];
++  
++  Mac48Address address;
++  buffer[0] = (key >> 40) & 0xff;
++  buffer[1] = (key >> 32) & 0xff;
++  buffer[2] = (key >> 24) & 0xff;
++  buffer[3] = ((key >> 16) & 0xff) | 0xeb;
++  buffer[4] = (key >> 8) & 0xff;
++  buffer[5] = (key >> 0) & 0xff;
++  address.CopyFrom (buffer);
++
++  return address;
++}
++
++} // namespace ns3
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/helper/tap-epc-helper.h ns-3.22/src/lte/helper/tap-epc-helper.h
+--- ns-3.22-backup/src/lte/helper/tap-epc-helper.h	1970-01-01 08:00:00.000000000 +0800
++++ ns-3.22/src/lte/helper/tap-epc-helper.h	2016-09-22 23:09:33.041597417 +0800
+@@ -0,0 +1,212 @@
++/* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
++/*
++ * Copyright (c) 2011-2013 Centre Tecnologic de Telecomunicacions de Catalunya (CTTC)
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation;
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ * Author: Jaume Nin <jnin@cttc.es>
++ *         Nicola Baldo <nbaldo@cttc.es>
++ *         Manuel Requena <manuel.requena@cttc.es>
++ */
++
++#ifndef TAP_EPC_HELPER_H
++#define TAP_EPC_HELPER_H
++
++#include <ns3/object.h>
++#include <ns3/ipv4-address-helper.h>
++#include <ns3/data-rate.h>
++#include <ns3/epc-tft.h>
++#include <ns3/eps-bearer.h>
++#include <ns3/epc-helper.h>
++#include <ns3/emu-epc-helper.h>
++#include <ns3/header.h>
++#include <ns3/system-condition.h>
++
++#include <fstream>
++
++namespace ns3 {
++
++class Node;
++class NetDevice;
++class VirtualNetDevice;
++class EpcSgwPgwApplication;
++class EpcX2;
++class TapEpcMme;
++
++/**
++ * \ingroup lte
++ *
++ * \brief Create an EPC network using TapFdNetDevice 
++ *
++ * This Helper will create an EPC network topology comprising of a
++ * single node that implements both the SGW and PGW functionality, and
++ * an MME node. The S1-U, X2-U and X2-C interfaces are realized using
++ * TapFdNetDevice; in particular, one device is used to send all the
++ * traffic related to these interfaces. 
++ */
++class TapEpcHelper : public EpcHelper
++{
++public:
++  
++  /** 
++   * Constructor
++   */
++  TapEpcHelper ();
++
++  /** 
++   * Destructor
++   */  
++  virtual ~TapEpcHelper ();
++  
++  // inherited from Object
++  /**
++   *  Register this type.
++   *  \return The object TypeId.
++   */
++  static TypeId GetTypeId (void);
++  virtual void DoInitialize ();
++  virtual void DoDispose ();
++
++  // inherited from EpcHelper
++  virtual void AddEnb (Ptr<Node> enbNode, Ptr<NetDevice> lteEnbNetDevice, uint16_t cellId);
++  virtual void AddUe (Ptr<NetDevice> ueLteDevice, uint64_t imsi);
++  virtual void AddX2Interface (Ptr<Node> enbNode1, Ptr<Node> enbNode2);
++  virtual uint8_t ActivateEpsBearer (Ptr<NetDevice> ueLteDevice, uint64_t imsi, Ptr<EpcTft> tft, EpsBearer bearer);
++  virtual Ptr<Node> GetPgwNode ();
++  virtual Ipv4InterfaceContainer AssignUeIpv4Address (NetDeviceContainer ueDevices);
++  virtual Ipv4Address GetUeDefaultGatewayAddress ();
++  virtual Mac48Address GetUeDefaultGatewayMacAddress ();
++  
++  enum Mode
++  {
++    Master,
++    Slave
++  };
++
++private:
++
++  void HandleS1apConnection (Ptr<Socket> socket, const Address &addr);
++  void HandleMasterConnection (Ptr<Socket> socket, const Address &addr);
++
++  void SendToSlaveSocket (Ptr<Packet> packet);
++  
++  void RecvFromS1apSocket (Ptr<Socket> socket);
++  void RecvFromMasterSocket (Ptr<Socket> socket);
++  void RecvFromSlaveSocket (Ptr<Socket> socket);
++  
++  void HandleMasterPacket (Ptr<Socket> socket, Ptr<Packet> packet);
++  void HandleS1apPacket (Ptr<Socket> socket, Ptr<Packet> packet);
++  
++  void MasterInitialize ();
++  void SlaveInitialize ();
++  
++  Mac48Address AllocateMac48Address (uint64_t key);
++
++  /** 
++   * helper to assign addresses to UE devices as well as to the TUN device of the SGW/PGW
++   */
++  Ipv4AddressHelper m_ueAddressHelper; 
++
++  /**
++   * SGW-PGW network element
++   */  
++  Ptr<Node> m_sgwPgw;
++  
++  Ptr<Node> m_mmeNode;
++  
++  Ptr<Node> m_master;
++  
++  Ptr<Node> m_slave;
++
++  /**
++   * SGW-PGW application
++   */
++  Ptr<EpcSgwPgwApplication> m_sgwPgwApp;
++
++  /**
++   * TUN device implementing tunneling of user data over GTP-U/UDP/IP
++   */
++  Ptr<VirtualNetDevice> m_tunDevice;
++
++  /**
++   * MME network element
++   */
++  Ptr<TapEpcMme> m_mme;
++
++  Ptr<TapEpcMme> m_slaveMme;
++  
++  Ptr<Socket> m_slaveSocket;
++
++  /** 
++   * helper to assign addresses to S1-U NetDevices 
++   */
++  Ipv4AddressHelper m_epcIpv4AddressHelper; 
++
++  /**
++   * UDP port where the GTP-U Socket is bound, fixed by the standard as 2152
++   */
++  uint16_t m_gtpuUdpPort;
++  
++  uint16_t m_s1apTcpPort;
++  
++  uint16_t m_masterTcpPort;
++
++  /**
++   * Map storing for each IMSI the corresponding eNB NetDevice
++   * 
++   */
++  std::map<uint64_t, Ptr<NetDevice> > m_imsiEnbDeviceMap;
++  
++  Ipv4Address m_sgwIpv4Address;
++  Ipv4Address m_mmeIpv4Address;
++  Ipv4Address m_masterIpv4Address;
++  Ipv4Address m_ueDefaultGatewayAddress;
++  
++  std::string m_ueDefaultGatewayMacAddress;
++  std::string m_tunMacAddress;
++  std::string m_sgwMacAddress;
++  std::string m_mmeMacAddress;
++  std::string m_masterMacAddress;
++
++  /**
++   * The name of the device used for the S1-U interface of the SGW
++   */
++  std::string m_sgwDeviceName;
++
++  /**
++   * The name of the device used for the S1-U interface of the eNB
++   */
++  std::string m_enbDeviceName;
++  
++  std::string m_mmeDeviceName;
++  std::string m_masterDeviceName;
++  std::string m_slaveDeviceName;
++  
++  std::string m_masterUeIpAddressBase;
++  std::string m_slaveUeIpAddressBase;
++  
++  std::string m_masterIpAddressBase;
++  std::string m_slaveIpAddressBase;
++  
++  Mode m_mode;
++
++  Time m_scheduleTime;
++
++  std::string m_logFile;
++  std::ofstream m_fileStream;
++};
++
++} // namespace ns3
++
++#endif // TAP_EPC_HELPER_H
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/model/epc-mme.cc ns-3.22/src/lte/model/epc-mme.cc
+--- ns-3.22-backup/src/lte/model/epc-mme.cc	2015-02-06 07:46:23.000000000 +0800
++++ ns-3.22/src/lte/model/epc-mme.cc	2016-10-10 22:48:30.416415077 +0800
+@@ -83,14 +83,14 @@ EpcMme::GetS11SapMme ()
+ }
+ 
+ void 
+-EpcMme::AddEnb (uint16_t gci, Ipv4Address enbS1uAddr, EpcS1apSapEnb* enbS1apSap)
++EpcMme::AddEnb (uint16_t cgi, Ipv4Address enbS1uAddr, EpcS1apSapEnb* enbS1apSap)
+ {
+-  NS_LOG_FUNCTION (this << gci << enbS1uAddr);
++  NS_LOG_FUNCTION (this << cgi << enbS1uAddr);
+   Ptr<EnbInfo> enbInfo = Create<EnbInfo> ();
+-  enbInfo->gci = gci;
++  enbInfo->cgi = cgi;
+   enbInfo->s1uAddr = enbS1uAddr;
+   enbInfo->s1apSapEnb = enbS1apSap;
+-  m_enbInfoMap[gci] = enbInfo;
++  m_enbInfoMap[cgi] = enbInfo;
+ }
+ 
+ void 
+@@ -123,15 +123,15 @@ EpcMme::AddBearer (uint64_t imsi, Ptr<Ep
+ // S1-AP SAP MME forwarded methods
+ 
+ void 
+-EpcMme::DoInitialUeMessage (uint64_t mmeUeS1Id, uint16_t enbUeS1Id, uint64_t imsi, uint16_t gci)
++EpcMme::DoInitialUeMessage (uint64_t mmeUeS1Id, uint16_t enbUeS1Id, uint64_t imsi, uint16_t cgi)
+ {
+-  NS_LOG_FUNCTION (this << mmeUeS1Id << enbUeS1Id << imsi << gci);
++  NS_LOG_FUNCTION (this << mmeUeS1Id << enbUeS1Id << imsi << cgi);
+   std::map<uint64_t, Ptr<UeInfo> >::iterator it = m_ueInfoMap.find (imsi);
+   NS_ASSERT_MSG (it != m_ueInfoMap.end (), "could not find any UE with IMSI " << imsi);
+-  it->second->cellId = gci;
++  it->second->cellId = cgi;
+   EpcS11SapSgw::CreateSessionRequestMessage msg;
+   msg.imsi = imsi;
+-  msg. uli.gci = gci;
++  msg. uli.cgi = cgi;
+   for (std::list<BearerInfo>::iterator bit = it->second->bearersToBeActivated.begin ();
+        bit != it->second->bearersToBeActivated.end ();
+        ++bit)
+@@ -153,20 +153,20 @@ EpcMme::DoInitialContextSetupResponse (u
+ }
+ 
+ void 
+-EpcMme::DoPathSwitchRequest (uint64_t enbUeS1Id, uint64_t mmeUeS1Id, uint16_t gci, std::list<EpcS1apSapMme::ErabSwitchedInDownlinkItem> erabToBeSwitchedInDownlinkList)
++EpcMme::DoPathSwitchRequest (uint64_t enbUeS1Id, uint64_t mmeUeS1Id, uint16_t cgi, std::list<EpcS1apSapMme::ErabSwitchedInDownlinkItem> erabToBeSwitchedInDownlinkList)
+ {
+-  NS_LOG_FUNCTION (this << mmeUeS1Id << enbUeS1Id << gci);
++  NS_LOG_FUNCTION (this << mmeUeS1Id << enbUeS1Id << cgi);
+ 
+   uint64_t imsi = mmeUeS1Id; 
+   std::map<uint64_t, Ptr<UeInfo> >::iterator it = m_ueInfoMap.find (imsi);
+   NS_ASSERT_MSG (it != m_ueInfoMap.end (), "could not find any UE with IMSI " << imsi);
+-  NS_LOG_INFO ("IMSI " << imsi << " old eNB: " << it->second->cellId << ", new eNB: " << gci);
+-  it->second->cellId = gci;
++  NS_LOG_INFO ("IMSI " << imsi << " old eNB: " << it->second->cellId << ", new eNB: " << cgi);
++  it->second->cellId = cgi;
+   it->second->enbUeS1Id = enbUeS1Id;
+ 
+   EpcS11SapSgw::ModifyBearerRequestMessage msg;
+   msg.teid = imsi; // trick to avoid the need for allocating TEIDs on the S11 interface
+-  msg.uli.gci = gci;
++  msg.uli.cgi = cgi;
+   // bearer modification is not supported for now
+   m_s11SapSgw->ModifyBearerRequest (msg);
+ }
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/model/epc-mme.h ns-3.22/src/lte/model/epc-mme.h
+--- ns-3.22-backup/src/lte/model/epc-mme.h	2015-02-06 07:46:23.000000000 +0800
++++ ns-3.22/src/lte/model/epc-mme.h	2016-10-10 22:48:30.416415077 +0800
+@@ -167,13 +167,13 @@ private:
+    */
+   struct EnbInfo : public SimpleRefCount<EnbInfo>
+   {
+-    uint16_t gci;
++    uint16_t cgi;
+     Ipv4Address s1uAddr;
+     EpcS1apSapEnb* s1apSapEnb;
+   };
+ 
+   /**
+-   * EnbInfo stored by EGCI
++   * EnbInfo stored by ECGI
+    * 
+    */
+   std::map<uint16_t, Ptr<EnbInfo> > m_enbInfoMap;
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/model/epc-s11-sap.h ns-3.22/src/lte/model/epc-s11-sap.h
+--- ns-3.22-backup/src/lte/model/epc-s11-sap.h	2015-02-06 07:46:23.000000000 +0800
++++ ns-3.22/src/lte/model/epc-s11-sap.h	2016-10-10 22:48:30.416415077 +0800
+@@ -57,7 +57,7 @@ public:
+    */
+   struct Uli
+   {
+-    uint16_t gci;
++    uint16_t cgi;
+   };
+   
+  
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/model/epc-s1ap-header.cc ns-3.22/src/lte/model/epc-s1ap-header.cc
+--- ns-3.22-backup/src/lte/model/epc-s1ap-header.cc	1970-01-01 08:00:00.000000000 +0800
++++ ns-3.22/src/lte/model/epc-s1ap-header.cc	2016-09-22 23:09:33.045597397 +0800
+@@ -0,0 +1,907 @@
++
++#include <ns3/log.h>
++#include <ns3/epc-s1ap-header.h>
++
++namespace ns3 {
++
++NS_LOG_COMPONENT_DEFINE ("EpcS1apHeader");
++
++NS_OBJECT_ENSURE_REGISTERED (EpcS1apHeader);
++
++EpcS1apHeader::EpcS1apHeader ()
++  : m_procedureCode (0x00),
++    m_typeOfMessage (0x00)
++{
++}
++
++EpcS1apHeader::~EpcS1apHeader ()
++{
++}
++
++TypeId
++EpcS1apHeader::GetTypeId (void)
++{
++  static TypeId tid = TypeId ("ns3::EpcS1apHeader")
++    .SetParent<Header> ()
++    .SetGroupName ("Lte")
++    .AddConstructor<EpcS1apHeader> ()
++  ;
++  return tid;
++}
++
++TypeId
++EpcS1apHeader::GetInstanceTypeId (void) const
++{
++  return GetTypeId ();
++}
++
++uint32_t
++EpcS1apHeader::GetSerializedSize (void) const
++{
++  return 2;
++}
++
++void
++EpcS1apHeader::Serialize (Buffer::Iterator start) const
++{
++  Buffer::Iterator i = start;
++  i.WriteU8 (m_procedureCode);
++  i.WriteU8 (m_typeOfMessage);
++}
++
++uint32_t
++EpcS1apHeader::Deserialize (Buffer::Iterator start)
++{
++  Buffer::Iterator i = start;
++  m_procedureCode = i.ReadU8 ();
++  m_typeOfMessage = i.ReadU8 ();
++  return GetSerializedSize ();
++}
++
++void
++EpcS1apHeader::Print (std::ostream &os) const
++{
++  os << "ProcedureCode=" << m_procedureCode;
++  os << "TypeOfMessage=" << m_typeOfMessage;
++}
++
++uint8_t
++EpcS1apHeader::GetTypeOfMessage () const
++{
++  return m_typeOfMessage;
++}
++
++void
++EpcS1apHeader::SetTypeOfMessage (uint8_t typeOfMessage)
++{
++  m_typeOfMessage = typeOfMessage;
++}
++  
++uint8_t
++EpcS1apHeader::GetProcedureCode () const
++{
++  return m_procedureCode;
++}
++
++void
++EpcS1apHeader::SetProcedureCode (uint8_t procedureCode)
++{
++  m_procedureCode = procedureCode;
++}
++
++NS_OBJECT_ENSURE_REGISTERED (InitialUeRequestHeader);
++
++InitialUeRequestHeader::InitialUeRequestHeader ()
++  : m_numberOfIes (0x00),
++    m_headerLength (0x14),
++    m_mmeUeS1Id (0x00),
++    m_enbUeS1Id (0x00),
++    m_stmsi (0x00),
++    m_ecgi (0x00)
++{
++}
++
++InitialUeRequestHeader::~InitialUeRequestHeader ()
++{
++}
++
++TypeId
++InitialUeRequestHeader::GetTypeId (void)
++{
++  static TypeId tid = TypeId ("ns3::InitialUeRequestHeader")
++    .SetParent<Header> ()
++    .SetGroupName ("Lte")
++    .AddConstructor<InitialUeRequestHeader> ()
++  ;
++  return tid;
++}
++
++TypeId
++InitialUeRequestHeader::GetInstanceTypeId (void) const
++{
++  return GetTypeId ();
++}
++
++uint32_t
++InitialUeRequestHeader::GetSerializedSize (void) const
++{
++  return m_headerLength;
++}
++
++void
++InitialUeRequestHeader::Serialize (Buffer::Iterator start) const
++{
++  Buffer::Iterator i = start;
++  i.WriteHtonU64 (m_mmeUeS1Id);
++  i.WriteHtonU16 (m_enbUeS1Id);
++  i.WriteHtonU64 (m_stmsi);
++  i.WriteHtonU16 (m_ecgi);
++}
++
++uint32_t
++InitialUeRequestHeader::Deserialize (Buffer::Iterator start)
++{
++  Buffer::Iterator i = start;
++  m_headerLength = 0;
++  
++  m_mmeUeS1Id = i.ReadNtohU64 ();
++  m_headerLength += sizeof m_mmeUeS1Id;
++  ++m_numberOfIes;
++  
++  m_enbUeS1Id = i.ReadNtohU16 ();
++  m_headerLength += sizeof m_enbUeS1Id;
++  ++m_numberOfIes;
++  
++  m_stmsi = i.ReadNtohU64 ();
++  m_headerLength += sizeof m_stmsi;
++  ++m_numberOfIes;
++  
++  m_ecgi = i.ReadNtohU16 ();
++  m_headerLength += sizeof m_ecgi;
++  ++m_numberOfIes;
++  
++  return GetSerializedSize ();
++}
++
++void
++InitialUeRequestHeader::Print (std::ostream &os) const
++{
++  os << "MmeUeS1Id=" << m_mmeUeS1Id;
++  os << "EnbUeS1Id=" << m_enbUeS1Id;
++  os << "Stmsi=" << m_stmsi;
++  os << "Ecgi=" << m_ecgi;
++}
++
++uint64_t
++InitialUeRequestHeader::GetMmeUeS1Id () const
++{
++  return m_mmeUeS1Id;
++}
++
++void
++InitialUeRequestHeader::SetMmeUeS1Id (uint64_t mmeUeS1Id)
++{
++  m_mmeUeS1Id = mmeUeS1Id;
++}
++  
++uint16_t
++InitialUeRequestHeader::GetEnbUeS1Id () const
++{
++  return m_enbUeS1Id;
++}
++
++void
++InitialUeRequestHeader::SetEnbUeS1Id (uint16_t enbUeS1Id)
++{
++  m_enbUeS1Id = enbUeS1Id;
++}
++  
++uint64_t
++InitialUeRequestHeader::GetStmsi () const
++{
++  return m_stmsi;
++}
++
++void
++InitialUeRequestHeader::SetStmsi (uint64_t stmsi)
++{
++  m_stmsi = stmsi;
++}
++  
++uint16_t
++InitialUeRequestHeader::GetEcgi () const
++{
++  return m_ecgi;
++}
++
++void
++InitialUeRequestHeader::SetEcgi (uint16_t ecgi)
++{
++  m_ecgi = ecgi;
++}
++
++NS_OBJECT_ENSURE_REGISTERED (ErabReleaseIndicationHeader);
++
++ErabReleaseIndicationHeader::ErabReleaseIndicationHeader ()
++  : m_numberOfIes (0x00),
++    m_headerLength (0x1B),
++    m_mmeUeS1Id (0x00),
++    m_enbUeS1Id (0x00),
++    m_erabToBeReleaseIndication ()
++{
++}
++
++ErabReleaseIndicationHeader::~ErabReleaseIndicationHeader ()
++{
++}
++
++TypeId
++ErabReleaseIndicationHeader::GetTypeId (void)
++{
++  static TypeId tid = TypeId ("ns3::ErabReleaseIndicationHeader")
++    .SetParent<Header> ()
++    .SetGroupName ("Lte")
++    .AddConstructor<ErabReleaseIndicationHeader> ()
++  ;
++  return tid;
++}
++
++TypeId
++ErabReleaseIndicationHeader::GetInstanceTypeId (void) const
++{
++  return GetTypeId ();
++}
++
++uint32_t
++ErabReleaseIndicationHeader::GetSerializedSize (void) const
++{
++  return m_headerLength;
++}
++
++void
++ErabReleaseIndicationHeader::Serialize (Buffer::Iterator start) const
++{
++  Buffer::Iterator i = start;
++  i.WriteHtonU64 (m_mmeUeS1Id);
++  i.WriteHtonU16 (m_enbUeS1Id);
++  
++  i.WriteU8 (m_erabToBeReleaseIndication.size ());
++
++  std::list<EpcS1apSapMme::ErabToBeReleasedIndication> indiation = m_erabToBeReleaseIndication;
++  std::list<EpcS1apSapMme::ErabToBeReleasedIndication>::iterator it;
++  for (it = indiation.begin ();
++       it != indiation.end ();
++       ++it)
++    {
++      i.WriteU8 (it->erabId);
++    }
++}
++
++uint32_t
++ErabReleaseIndicationHeader::Deserialize (Buffer::Iterator start)
++{
++  Buffer::Iterator i = start;
++  m_headerLength = 0;
++  
++  m_mmeUeS1Id = i.ReadNtohU64 ();
++  m_headerLength += sizeof m_mmeUeS1Id;
++  ++m_numberOfIes;
++  
++  m_enbUeS1Id = i.ReadNtohU16 ();
++  m_headerLength += sizeof m_enbUeS1Id;
++  ++m_numberOfIes;
++  
++  uint8_t size = i.ReadU8 ();
++  for (uint8_t u = 0; u < size; ++u)
++    {
++      EpcS1apSapMme::ErabToBeReleasedIndication erab;
++      erab.erabId = i.ReadU8 ();
++      m_headerLength += sizeof(uint8_t);
++      
++      m_erabToBeReleaseIndication.push_back (erab);
++      ++m_numberOfIes;
++    }
++  
++  return GetSerializedSize ();
++}
++
++void
++ErabReleaseIndicationHeader::Print (std::ostream &os) const
++{
++  os << "MmeUeS1Id=" << m_mmeUeS1Id;
++  os << "EnbUeS1Id=" << m_enbUeS1Id;
++}
++
++uint64_t
++ErabReleaseIndicationHeader::GetMmeUeS1Id () const
++{
++  return m_mmeUeS1Id;
++}
++
++void
++ErabReleaseIndicationHeader::SetMmeUeS1Id (uint64_t mmeUeS1Id)
++{
++  m_mmeUeS1Id = mmeUeS1Id;
++}
++  
++uint16_t
++ErabReleaseIndicationHeader::GetEnbUeS1Id () const
++{
++  return m_enbUeS1Id;
++}
++
++void
++ErabReleaseIndicationHeader::SetEnbUeS1Id (uint16_t enbUeS1Id)
++{
++  m_enbUeS1Id = enbUeS1Id;
++}
++
++std::list<EpcS1apSapMme::ErabToBeReleasedIndication>
++ErabReleaseIndicationHeader::GetErabToBeReleaseIndication () const
++{
++  return m_erabToBeReleaseIndication;
++}
++
++void
++ErabReleaseIndicationHeader::SetErabToBeReleaseIndication (std::list<EpcS1apSapMme::ErabToBeReleasedIndication> erabToBeReleaseIndication)
++{
++  m_erabToBeReleaseIndication = erabToBeReleaseIndication;
++}
++
++NS_OBJECT_ENSURE_REGISTERED (InitialContextSetupResponseHeader);
++
++InitialContextSetupResponseHeader::InitialContextSetupResponseHeader ()
++  : m_numberOfIes (0x00),
++    m_headerLength (0x0A),
++    m_mmeUeS1Id (0x00),
++    m_enbUeS1Id (0x00)
++{
++}
++
++InitialContextSetupResponseHeader::~InitialContextSetupResponseHeader ()
++{
++}
++
++TypeId
++InitialContextSetupResponseHeader::GetTypeId (void)
++{
++  static TypeId tid = TypeId ("ns3::InitialContextSetupResponseHeader")
++    .SetParent<Header> ()
++    .SetGroupName ("Lte")
++    .AddConstructor<InitialContextSetupResponseHeader> ()
++  ;
++  return tid;
++}
++
++TypeId
++InitialContextSetupResponseHeader::GetInstanceTypeId (void) const
++{
++  return GetTypeId ();
++}
++
++uint32_t
++InitialContextSetupResponseHeader::GetSerializedSize (void) const
++{
++  return m_headerLength;
++}
++
++void
++InitialContextSetupResponseHeader::Serialize (Buffer::Iterator start) const
++{
++  Buffer::Iterator i = start;
++  i.WriteHtonU64 (m_mmeUeS1Id);
++  i.WriteHtonU16 (m_enbUeS1Id);
++}
++
++uint32_t
++InitialContextSetupResponseHeader::Deserialize (Buffer::Iterator start)
++{
++  Buffer::Iterator i = start;
++  m_headerLength = 0;
++  
++  m_mmeUeS1Id = i.ReadNtohU64 ();
++  m_headerLength += sizeof m_mmeUeS1Id;
++  ++m_numberOfIes;
++  
++  m_enbUeS1Id = i.ReadNtohU16 ();
++  m_headerLength += sizeof m_enbUeS1Id;
++  ++m_numberOfIes;
++  
++  return GetSerializedSize ();
++}
++
++void
++InitialContextSetupResponseHeader::Print (std::ostream &os) const
++{
++  os << "MmeUeS1Id=" << m_mmeUeS1Id;
++  os << "EnbUeS1Id=" << m_enbUeS1Id;
++}
++
++uint64_t
++InitialContextSetupResponseHeader::GetMmeUeS1Id () const
++{
++  return m_mmeUeS1Id;
++}
++
++void
++InitialContextSetupResponseHeader::SetMmeUeS1Id (uint64_t mmeUeS1Id)
++{
++  m_mmeUeS1Id = mmeUeS1Id;
++}
++  
++uint16_t
++InitialContextSetupResponseHeader::GetEnbUeS1Id () const
++{
++  return m_enbUeS1Id;
++}
++
++void
++InitialContextSetupResponseHeader::SetEnbUeS1Id (uint16_t enbUeS1Id)
++{
++  m_enbUeS1Id = enbUeS1Id;
++}
++
++NS_OBJECT_ENSURE_REGISTERED (PathSwitchRequestHeader);
++
++PathSwitchRequestHeader::PathSwitchRequestHeader ()
++  : m_numberOfIes (0x00),
++    m_headerLength (0xB3),
++    m_enbUeS1Id (0x00),
++    m_mmeUeS1Id (0x00),
++    m_cgi (0x00),
++    m_erabToBeSwitchedInDownlinkList ()
++{
++}
++
++PathSwitchRequestHeader::~PathSwitchRequestHeader ()
++{
++}
++
++TypeId
++PathSwitchRequestHeader::GetTypeId (void)
++{
++  static TypeId tid = TypeId ("ns3::PathSwitchRequestHeader")
++    .SetParent<Header> ()
++    .SetGroupName ("Lte")
++    .AddConstructor<PathSwitchRequestHeader> ()
++  ;
++  return tid;
++}
++
++TypeId
++PathSwitchRequestHeader::GetInstanceTypeId (void) const
++{
++  return GetTypeId ();
++}
++
++uint32_t
++PathSwitchRequestHeader::GetSerializedSize (void) const
++{
++  return m_headerLength;
++}
++
++void
++PathSwitchRequestHeader::Serialize (Buffer::Iterator start) const
++{
++  Buffer::Iterator i = start;
++  i.WriteHtonU64 (m_mmeUeS1Id);
++  i.WriteHtonU64 (m_enbUeS1Id);
++  i.WriteHtonU16 (m_cgi);
++  
++  i.WriteU8 (m_erabToBeSwitchedInDownlinkList.size ());
++  
++  std::list<EpcS1apSapMme::ErabSwitchedInDownlinkItem> items = m_erabToBeSwitchedInDownlinkList;
++  std::list<EpcS1apSapMme::ErabSwitchedInDownlinkItem>::iterator it;
++  for (it = items.begin ();
++       it != items.end ();
++       ++it)
++    {
++      i.WriteHtonU16 (it->erabId);
++      i.WriteHtonU32 (it->enbTransportLayerAddress.Get ());
++      i.WriteHtonU32 (it->enbTeid);
++    }
++}
++
++uint32_t
++PathSwitchRequestHeader::Deserialize (Buffer::Iterator start)
++{
++  Buffer::Iterator i = start;
++  m_headerLength = 0;
++  
++  m_mmeUeS1Id = i.ReadNtohU64 ();
++  m_headerLength += sizeof m_mmeUeS1Id;
++  ++m_numberOfIes;
++  
++  m_enbUeS1Id = i.ReadNtohU64 ();
++  m_headerLength += sizeof m_enbUeS1Id;
++  ++m_numberOfIes;
++  
++  m_cgi = i.ReadNtohU16 ();
++  m_headerLength += sizeof m_cgi;
++  ++m_numberOfIes;
++  
++  uint8_t size = i.ReadU8 ();
++  for (uint8_t j = 0; j < size; ++j) 
++    {
++      EpcS1apSapMme::ErabSwitchedInDownlinkItem erab;
++      erab.erabId = i.ReadNtohU16 ();
++      m_headerLength += sizeof(uint16_t);
++      
++      erab.enbTransportLayerAddress = Ipv4Address (i.ReadNtohU32 ());
++      erab.enbTeid = i.ReadNtohU32 ();
++      m_headerLength +=  sizeof(uint32_t) * 2;
++      
++      m_erabToBeSwitchedInDownlinkList.push_back (erab);
++      ++m_numberOfIes;
++    }
++  
++  return GetSerializedSize ();
++}
++
++void
++PathSwitchRequestHeader::Print (std::ostream &os) const
++{
++  os << "EnbUeS1Id=" << m_enbUeS1Id;
++  os << "MmeUeS1Id=" << m_mmeUeS1Id;
++  os << "Cgi=" << m_cgi;
++}
++
++uint64_t
++PathSwitchRequestHeader::GetMmeUeS1Id () const
++{
++  return m_mmeUeS1Id;
++}
++
++void
++PathSwitchRequestHeader::SetMmeUeS1Id (uint64_t mmeUeS1Id)
++{
++  m_mmeUeS1Id = mmeUeS1Id;
++}
++  
++uint64_t
++PathSwitchRequestHeader::GetEnbUeS1Id () const
++{
++  return m_enbUeS1Id;
++}
++
++void
++PathSwitchRequestHeader::SetEnbUeS1Id (uint64_t enbUeS1Id)
++{
++  m_enbUeS1Id = enbUeS1Id;
++}
++
++uint16_t
++PathSwitchRequestHeader::GetCgi () const
++{
++  return m_cgi;
++}
++
++void
++PathSwitchRequestHeader::SetCgi (uint16_t cgi)
++{
++  m_cgi = cgi;
++}
++
++std::list<EpcS1apSapMme::ErabSwitchedInDownlinkItem>
++PathSwitchRequestHeader::GetErabToBeSwitchedInDownlinkList () const
++{
++  return m_erabToBeSwitchedInDownlinkList;
++}
++
++void
++PathSwitchRequestHeader::SetErabToBeSwitchedInDownlinkList (std::list<EpcS1apSapMme::ErabSwitchedInDownlinkItem> erabToBeSwitchedInDownlinkList)
++{
++  m_erabToBeSwitchedInDownlinkList = erabToBeSwitchedInDownlinkList;
++}
++
++NS_OBJECT_ENSURE_REGISTERED (InitialContextSetupRequestHeader);
++
++InitialContextSetupRequestHeader::InitialContextSetupRequestHeader ()
++  : m_numberOfIes (0x00),
++    m_headerLength (0x290),
++    m_mmeUeS1Id (0x00),
++    m_enbUeS1Id (0x00)
++{
++}
++
++InitialContextSetupRequestHeader::~InitialContextSetupRequestHeader ()
++{
++}
++
++TypeId
++InitialContextSetupRequestHeader::GetTypeId (void)
++{
++  static TypeId tid = TypeId ("ns3::InitialContextSetupRequestHeader")
++    .SetParent<Header> ()
++    .SetGroupName ("Lte")
++    .AddConstructor<InitialContextSetupRequestHeader> ()
++  ;
++  return tid;
++}
++
++TypeId
++InitialContextSetupRequestHeader::GetInstanceTypeId (void) const
++{
++  return GetTypeId ();
++}
++
++uint32_t
++InitialContextSetupRequestHeader::GetSerializedSize (void) const
++{
++  return m_headerLength;
++}
++
++void
++InitialContextSetupRequestHeader::Serialize (Buffer::Iterator start) const
++{
++  Buffer::Iterator i = start;
++  i.WriteHtonU64 (m_mmeUeS1Id);
++  i.WriteHtonU16 (m_enbUeS1Id);
++  
++  i.WriteU8 (m_erabToBeSetupList.size ());
++  
++  std::list<EpcS1apSapEnb::ErabToBeSetupItem> items = m_erabToBeSetupList;
++  std::list<EpcS1apSapEnb::ErabToBeSetupItem>::iterator it;
++  for (it = items.begin ();
++       it != items.end ();
++       ++it)
++    {
++      i.WriteU8 (it->erabId);
++      
++      i.WriteHtonU16 (it->erabLevelQosParameters.qci);
++      i.WriteHtonU64 (it->erabLevelQosParameters.gbrQosInfo.gbrDl);
++      i.WriteHtonU64 (it->erabLevelQosParameters.gbrQosInfo.gbrUl);
++      i.WriteHtonU64 (it->erabLevelQosParameters.gbrQosInfo.mbrDl);
++      i.WriteHtonU64 (it->erabLevelQosParameters.gbrQosInfo.mbrUl);
++      i.WriteU8 (it->erabLevelQosParameters.arp.priorityLevel);
++      i.WriteU8 (it->erabLevelQosParameters.arp.preemptionCapability);
++      i.WriteU8 (it->erabLevelQosParameters.arp.preemptionVulnerability);
++      
++      i.WriteHtonU32 (it->transportLayerAddress.Get ());
++      i.WriteHtonU32 (it->sgwTeid);
++    }
++}
++
++uint32_t
++InitialContextSetupRequestHeader::Deserialize (Buffer::Iterator start)
++{
++  Buffer::Iterator i = start;
++  m_headerLength = 0;
++  
++  m_mmeUeS1Id = i.ReadNtohU64 ();
++  m_headerLength += sizeof m_mmeUeS1Id;
++  ++m_numberOfIes;
++  
++  m_enbUeS1Id = i.ReadNtohU16 ();
++  m_headerLength += sizeof m_enbUeS1Id;
++  ++m_numberOfIes;
++  
++  uint8_t size = i.ReadU8 ();
++  for (uint8_t u = 0; u < size; ++u)
++    {
++      EpcS1apSapEnb::ErabToBeSetupItem erab;
++      erab.erabId = i.ReadU8 ();
++      m_headerLength += sizeof(uint8_t);
++      
++      erab.erabLevelQosParameters = EpsBearer ((EpsBearer::Qci) i.ReadNtohU16 ());
++      m_headerLength += sizeof(uint16_t);
++  
++      erab.erabLevelQosParameters.gbrQosInfo.gbrDl = i.ReadNtohU64 ();
++      erab.erabLevelQosParameters.gbrQosInfo.gbrUl = i.ReadNtohU64 ();
++      erab.erabLevelQosParameters.gbrQosInfo.mbrDl = i.ReadNtohU64 ();
++      erab.erabLevelQosParameters.gbrQosInfo.mbrUl = i.ReadNtohU64 ();
++      m_headerLength += sizeof(uint64_t) * 4;
++  
++      erab.erabLevelQosParameters.arp.priorityLevel = i.ReadU8 ();
++      erab.erabLevelQosParameters.arp.preemptionCapability = i.ReadU8 ();
++      erab.erabLevelQosParameters.arp.preemptionVulnerability = i.ReadU8 ();
++      m_headerLength += sizeof(uint8_t) * 3;
++      
++      erab.transportLayerAddress = Ipv4Address (i.ReadNtohU32 ());
++      erab.sgwTeid = i.ReadNtohU32 ();
++      m_headerLength += sizeof(uint32_t) * 2;
++  
++      m_erabToBeSetupList.push_back (erab);
++      ++m_numberOfIes;
++    }
++    
++  return GetSerializedSize ();
++}
++
++void
++InitialContextSetupRequestHeader::Print (std::ostream &os) const
++{
++  os << "MmeUeS1Id=" << m_mmeUeS1Id;
++  os << "EnbUeS1Id=" << m_enbUeS1Id;
++}
++
++uint64_t
++InitialContextSetupRequestHeader::GetMmeUeS1Id () const
++{
++  return m_mmeUeS1Id;
++}
++
++void
++InitialContextSetupRequestHeader::SetMmeUeS1Id (uint64_t mmeUeS1Id)
++{
++  m_mmeUeS1Id = mmeUeS1Id;
++}
++  
++uint16_t
++InitialContextSetupRequestHeader::GetEnbUeS1Id () const
++{
++  return m_enbUeS1Id;
++}
++
++void
++InitialContextSetupRequestHeader::SetEnbUeS1Id (uint16_t enbUeS1Id)
++{
++  m_enbUeS1Id = enbUeS1Id;
++}
++
++std::list<EpcS1apSapEnb::ErabToBeSetupItem>
++InitialContextSetupRequestHeader::GetErabToBeSetupList () const
++{
++  return m_erabToBeSetupList;
++}
++
++void
++InitialContextSetupRequestHeader::SetErabToBeSetupList (std::list<EpcS1apSapEnb::ErabToBeSetupItem> erabToBeSetupList)
++{
++  m_erabToBeSetupList = erabToBeSetupList;
++}
++
++NS_OBJECT_ENSURE_REGISTERED (PathSwitchRequestAcknowledgeHeader);
++
++PathSwitchRequestAcknowledgeHeader::PathSwitchRequestAcknowledgeHeader ()
++  : m_numberOfIes (0x00),
++    m_headerLength (0xA3),
++    m_enbUeS1Id (0x00),
++    m_mmeUeS1Id (0x00),
++    m_cgi (0x00),
++    m_erabToBeSwitchedInUplinkList ()
++{
++}
++
++PathSwitchRequestAcknowledgeHeader::~PathSwitchRequestAcknowledgeHeader ()
++{
++}
++
++TypeId
++PathSwitchRequestAcknowledgeHeader::GetTypeId (void)
++{
++  static TypeId tid = TypeId ("ns3::PathSwitchRequestAcknowledgeHeader")
++    .SetParent<Header> ()
++    .SetGroupName ("Lte")
++    .AddConstructor<PathSwitchRequestAcknowledgeHeader> ()
++  ;
++  return tid;
++}
++
++TypeId
++PathSwitchRequestAcknowledgeHeader::GetInstanceTypeId (void) const
++{
++  return GetTypeId ();
++}
++
++uint32_t
++PathSwitchRequestAcknowledgeHeader::GetSerializedSize (void) const
++{
++  return m_headerLength;
++}
++
++void
++PathSwitchRequestAcknowledgeHeader::Serialize (Buffer::Iterator start) const
++{
++  Buffer::Iterator i = start;
++  i.WriteHtonU64 (m_mmeUeS1Id);
++  i.WriteHtonU64 (m_enbUeS1Id);
++  i.WriteHtonU16 (m_cgi);
++  
++  i.WriteU8 (m_erabToBeSwitchedInUplinkList.size ());
++  
++  std::list<EpcS1apSapEnb::ErabSwitchedInUplinkItem> items = m_erabToBeSwitchedInUplinkList;
++  std::list<EpcS1apSapEnb::ErabSwitchedInUplinkItem>::iterator it;
++  for (it = items.begin ();
++       it != items.end ();
++       ++it)
++    {
++      i.WriteU8 (it->erabId);
++      i.WriteHtonU32 (it->transportLayerAddress.Get ());
++      i.WriteHtonU32 (it->enbTeid);
++    }
++}
++
++uint32_t
++PathSwitchRequestAcknowledgeHeader::Deserialize (Buffer::Iterator start)
++{
++  Buffer::Iterator i = start;
++  m_headerLength = 0;
++  
++  m_mmeUeS1Id = i.ReadNtohU64 ();
++  m_headerLength += sizeof m_mmeUeS1Id;
++  ++m_numberOfIes;
++  
++  m_enbUeS1Id = i.ReadNtohU64 ();
++  m_headerLength += sizeof m_enbUeS1Id;
++  ++m_numberOfIes;
++  
++  m_cgi = i.ReadNtohU16 ();
++  m_headerLength += sizeof m_cgi;
++  ++m_numberOfIes;
++  
++  uint8_t size = i.ReadU8 ();
++  for (uint8_t u = 0; u < size; ++u)
++    {
++      EpcS1apSapEnb::ErabSwitchedInUplinkItem erab;
++      erab.erabId = i.ReadU8 ();
++      m_headerLength += sizeof(uint8_t);
++      
++      erab.transportLayerAddress = Ipv4Address (i.ReadNtohU32 ());
++      erab.enbTeid = i.ReadNtohU32 ();
++      m_headerLength += sizeof(uint32_t) * 2;
++      
++      m_erabToBeSwitchedInUplinkList.push_back (erab);
++      ++m_numberOfIes;
++    }
++  
++  return GetSerializedSize ();
++}
++
++void
++PathSwitchRequestAcknowledgeHeader::Print (std::ostream &os) const
++{
++  os << "MmeUeS1Id=" << m_mmeUeS1Id;
++  os << "EnbUeS1Id=" << m_enbUeS1Id;
++  os << "Cgi=" << m_cgi;
++}
++
++uint64_t
++PathSwitchRequestAcknowledgeHeader::GetMmeUeS1Id () const
++{
++  return m_mmeUeS1Id;
++}
++
++void
++PathSwitchRequestAcknowledgeHeader::SetMmeUeS1Id (uint64_t mmeUeS1Id)
++{
++  m_mmeUeS1Id = mmeUeS1Id;
++}
++  
++uint64_t
++PathSwitchRequestAcknowledgeHeader::GetEnbUeS1Id () const
++{
++  return m_enbUeS1Id;
++}
++
++void
++PathSwitchRequestAcknowledgeHeader::SetEnbUeS1Id (uint64_t enbUeS1Id)
++{
++  m_enbUeS1Id = enbUeS1Id;
++}
++
++uint16_t
++PathSwitchRequestAcknowledgeHeader::GetCgi () const
++{
++  return m_cgi;
++}
++
++void
++PathSwitchRequestAcknowledgeHeader::SetCgi (uint16_t cgi)
++{
++  m_cgi = cgi;
++}
++
++std::list<EpcS1apSapEnb::ErabSwitchedInUplinkItem>
++PathSwitchRequestAcknowledgeHeader::GetErabToBeSwitchedInUplinkList () const
++{
++  return m_erabToBeSwitchedInUplinkList;
++}
++
++void
++PathSwitchRequestAcknowledgeHeader::SetErabToBeSwitchedInUplinkList (std::list<EpcS1apSapEnb::ErabSwitchedInUplinkItem> erabToBeSwitchedInUplinkList)
++{
++  m_erabToBeSwitchedInUplinkList = erabToBeSwitchedInUplinkList;
++}
++
++}
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/model/epc-s1ap-header.h ns-3.22/src/lte/model/epc-s1ap-header.h
+--- ns-3.22-backup/src/lte/model/epc-s1ap-header.h	1970-01-01 08:00:00.000000000 +0800
++++ ns-3.22/src/lte/model/epc-s1ap-header.h	2016-09-22 23:09:33.045597397 +0800
+@@ -0,0 +1,245 @@
++
++#ifndef EPC_S1AP_HEADER_H
++#define EPC_S1AP_HEADER_H
++
++#include <ns3/header.h>
++#include <ns3/epc-s1ap-sap.h>
++
++namespace ns3 {
++
++class EpcS1apHeader : public Header
++{
++public:
++  EpcS1apHeader ();
++  virtual ~EpcS1apHeader ();
++  
++  static TypeId GetTypeId (void);
++  virtual TypeId GetInstanceTypeId (void) const;
++  virtual uint32_t GetSerializedSize (void) const;
++  virtual void Serialize (Buffer::Iterator start) const;
++  virtual uint32_t Deserialize (Buffer::Iterator start);
++  virtual void Print (std::ostream &os) const;
++  
++  uint8_t GetProcedureCode () const;
++  void SetProcedureCode (uint8_t procedureCode);
++  
++  uint8_t GetTypeOfMessage () const;
++  void SetTypeOfMessage (uint8_t typeOfMessage);
++
++  enum ProcedureCode_t
++  {
++    InitialUeMessage = 1,
++    ErabRelease = 2,
++    InitialContextSetup = 3,
++    PathSwitchRequest = 4
++  };
++
++  enum TypeOfMessgae_t
++  {
++    InitiatingMessage = 5,
++    SuccessfulOutcome = 6,
++    UnsuccessfulOutcome = 7
++  };
++
++private:
++  uint8_t m_procedureCode;
++  uint8_t m_typeOfMessage;
++};
++
++class InitialUeRequestHeader : public Header
++{
++public:
++  InitialUeRequestHeader ();
++  virtual ~InitialUeRequestHeader ();
++  
++  static TypeId GetTypeId (void);
++  virtual TypeId GetInstanceTypeId (void) const;
++  virtual uint32_t GetSerializedSize (void) const;
++  virtual void Serialize (Buffer::Iterator start) const;
++  virtual uint32_t Deserialize (Buffer::Iterator start);
++  virtual void Print (std::ostream &os) const;
++  
++  uint64_t GetMmeUeS1Id () const;
++  void SetMmeUeS1Id (uint64_t mmeUeS1Id);
++  
++  uint16_t GetEnbUeS1Id () const;
++  void SetEnbUeS1Id (uint16_t enbUeS1Id);
++  
++  uint64_t GetStmsi () const;
++  void SetStmsi (uint64_t stmsi);
++  
++  uint16_t GetEcgi () const;
++  void SetEcgi (uint16_t ecgi);
++
++private:
++  uint32_t m_numberOfIes;
++  uint32_t m_headerLength;
++
++  uint64_t m_mmeUeS1Id;
++  uint16_t m_enbUeS1Id;
++  uint64_t m_stmsi;
++  uint16_t m_ecgi;
++};
++
++class ErabReleaseIndicationHeader : public Header
++{
++public:
++  ErabReleaseIndicationHeader ();
++  virtual ~ErabReleaseIndicationHeader ();
++  
++  static TypeId GetTypeId (void);
++  virtual TypeId GetInstanceTypeId (void) const;
++  virtual uint32_t GetSerializedSize (void) const;
++  virtual void Serialize (Buffer::Iterator start) const;
++  virtual uint32_t Deserialize (Buffer::Iterator start);
++  virtual void Print (std::ostream &os) const;
++  
++  uint64_t GetMmeUeS1Id () const;
++  void SetMmeUeS1Id (uint64_t mmeUeS1Id);
++  
++  uint16_t GetEnbUeS1Id () const;
++  void SetEnbUeS1Id (uint16_t enbUeS1Id);
++  
++  std::list<EpcS1apSapMme::ErabToBeReleasedIndication> GetErabToBeReleaseIndication () const;
++  void SetErabToBeReleaseIndication (std::list<EpcS1apSapMme::ErabToBeReleasedIndication> erabToBeReleaseIndication);
++
++private:
++  uint32_t m_numberOfIes;
++  uint32_t m_headerLength;
++
++  uint64_t m_mmeUeS1Id;
++  uint16_t m_enbUeS1Id;
++  std::list<EpcS1apSapMme::ErabToBeReleasedIndication> m_erabToBeReleaseIndication;
++};
++
++class InitialContextSetupResponseHeader : public Header
++{
++public:
++  InitialContextSetupResponseHeader ();
++  virtual ~InitialContextSetupResponseHeader ();
++  
++  static TypeId GetTypeId (void);
++  virtual TypeId GetInstanceTypeId (void) const;
++  virtual uint32_t GetSerializedSize (void) const;
++  virtual void Serialize (Buffer::Iterator start) const;
++  virtual uint32_t Deserialize (Buffer::Iterator start);
++  virtual void Print (std::ostream &os) const;
++  
++  uint64_t GetMmeUeS1Id () const;
++  void SetMmeUeS1Id (uint64_t mmeUeS1Id);
++  
++  uint16_t GetEnbUeS1Id () const;
++  void SetEnbUeS1Id (uint16_t enbUeS1Id);
++
++private:
++  uint32_t m_numberOfIes;
++  uint32_t m_headerLength;
++
++  uint64_t m_mmeUeS1Id;
++  uint16_t m_enbUeS1Id;
++};
++
++class PathSwitchRequestHeader : public Header
++{
++public:
++  PathSwitchRequestHeader ();
++  virtual ~PathSwitchRequestHeader ();
++  
++  static TypeId GetTypeId (void);
++  virtual TypeId GetInstanceTypeId (void) const;
++  virtual uint32_t GetSerializedSize (void) const;
++  virtual void Serialize (Buffer::Iterator start) const;
++  virtual uint32_t Deserialize (Buffer::Iterator start);
++  virtual void Print (std::ostream &os) const;
++  
++  uint64_t GetEnbUeS1Id () const;
++  void SetEnbUeS1Id (uint64_t enbUeS1Id);
++  
++  uint64_t GetMmeUeS1Id () const;
++  void SetMmeUeS1Id (uint64_t mmeUeS1Id);
++  
++  uint16_t GetCgi () const;
++  void SetCgi (uint16_t cgi);
++  
++  std::list<EpcS1apSapMme::ErabSwitchedInDownlinkItem> GetErabToBeSwitchedInDownlinkList () const;
++  void SetErabToBeSwitchedInDownlinkList (std::list<EpcS1apSapMme::ErabSwitchedInDownlinkItem> erabToBeSwitchedInDownlinkList);
++
++private:
++  uint32_t m_numberOfIes;
++  uint32_t m_headerLength;
++  
++  uint64_t m_enbUeS1Id;
++  uint64_t m_mmeUeS1Id;
++  uint16_t m_cgi;
++  std::list<EpcS1apSapMme::ErabSwitchedInDownlinkItem> m_erabToBeSwitchedInDownlinkList;
++};
++
++class InitialContextSetupRequestHeader : public Header
++{
++public:
++  InitialContextSetupRequestHeader ();
++  virtual ~InitialContextSetupRequestHeader ();
++  
++  static TypeId GetTypeId (void);
++  virtual TypeId GetInstanceTypeId (void) const;
++  virtual uint32_t GetSerializedSize (void) const;
++  virtual void Serialize (Buffer::Iterator start) const;
++  virtual uint32_t Deserialize (Buffer::Iterator start);
++  virtual void Print (std::ostream &os) const;
++  
++  uint64_t GetMmeUeS1Id () const;
++  void SetMmeUeS1Id (uint64_t mmeUeS1Id);
++  
++  uint16_t GetEnbUeS1Id () const;
++  void SetEnbUeS1Id (uint16_t enbUeS1Id);
++  
++  std::list<EpcS1apSapEnb::ErabToBeSetupItem> GetErabToBeSetupList () const;
++  void SetErabToBeSetupList (std::list<EpcS1apSapEnb::ErabToBeSetupItem> erabToBeSetupList);
++  
++private:
++  uint32_t m_numberOfIes;
++  uint32_t m_headerLength;
++
++  uint64_t m_mmeUeS1Id;
++  uint16_t m_enbUeS1Id;
++  std::list<EpcS1apSapEnb::ErabToBeSetupItem> m_erabToBeSetupList;
++};
++
++class PathSwitchRequestAcknowledgeHeader : public Header
++{
++public:
++  PathSwitchRequestAcknowledgeHeader ();
++  virtual ~PathSwitchRequestAcknowledgeHeader ();
++  
++  static TypeId GetTypeId (void);
++  virtual TypeId GetInstanceTypeId (void) const;
++  virtual uint32_t GetSerializedSize (void) const;
++  virtual void Serialize (Buffer::Iterator start) const;
++  virtual uint32_t Deserialize (Buffer::Iterator start);
++  virtual void Print (std::ostream &os) const;
++  
++  uint64_t GetEnbUeS1Id () const;
++  void SetEnbUeS1Id (uint64_t enbUeS1Id);
++  
++  uint64_t GetMmeUeS1Id () const;
++  void SetMmeUeS1Id (uint64_t mmeUeS1Id);
++  
++  uint16_t GetCgi () const;
++  void SetCgi (uint16_t cgi);
++  
++  std::list<EpcS1apSapEnb::ErabSwitchedInUplinkItem> GetErabToBeSwitchedInUplinkList () const;
++  void SetErabToBeSwitchedInUplinkList (std::list<EpcS1apSapEnb::ErabSwitchedInUplinkItem> erabToBeSwitchedInUplinkList);
++
++private:
++  uint32_t m_numberOfIes;
++  uint32_t m_headerLength;
++
++  uint64_t m_enbUeS1Id;
++  uint64_t m_mmeUeS1Id;
++  uint16_t m_cgi;
++  std::list<EpcS1apSapEnb::ErabSwitchedInUplinkItem> m_erabToBeSwitchedInUplinkList;
++};
++
++} // namespace ns3
++
++#endif // EPC_S1AP_HEADER_H
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/model/epc-s1ap-sap.h ns-3.22/src/lte/model/epc-s1ap-sap.h
+--- ns-3.22-backup/src/lte/model/epc-s1ap-sap.h	2015-02-06 07:46:23.000000000 +0800
++++ ns-3.22/src/lte/model/epc-s1ap-sap.h	2016-10-10 22:48:30.420415046 +0800
+@@ -118,7 +118,7 @@ public:
+    * PATH SWITCH REQUEST message, see 3GPP TS 36.413 9.1.5.8
+    * 
+    */
+-  virtual void PathSwitchRequest (uint64_t enbUeS1Id, uint64_t mmeUeS1Id, uint16_t gci, std::list<ErabSwitchedInDownlinkItem> erabToBeSwitchedInDownlinkList) = 0;
++  virtual void PathSwitchRequest (uint64_t enbUeS1Id, uint64_t mmeUeS1Id, uint16_t cgi, std::list<ErabSwitchedInDownlinkItem> erabToBeSwitchedInDownlinkList) = 0;
+ };
+ 
+ 
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/model/epc-sgw-pgw-application.cc ns-3.22/src/lte/model/epc-sgw-pgw-application.cc
+--- ns-3.22-backup/src/lte/model/epc-sgw-pgw-application.cc	2015-02-06 07:46:23.000000000 +0800
++++ ns-3.22/src/lte/model/epc-sgw-pgw-application.cc	2016-10-10 22:48:30.420415046 +0800
+@@ -27,6 +27,7 @@
+ #include "ns3/inet-socket-address.h"
+ #include "ns3/epc-gtpu-header.h"
+ #include "ns3/abort.h"
++#include "ns3/teid-dscp-mapping.h"
+ 
+ namespace ns3 {
+ 
+@@ -260,7 +261,7 @@ EpcSgwPgwApplication::DoCreateSessionReq
+   NS_LOG_FUNCTION (this << req.imsi);
+   std::map<uint64_t, Ptr<UeInfo> >::iterator ueit = m_ueInfoByImsiMap.find (req.imsi);
+   NS_ASSERT_MSG (ueit != m_ueInfoByImsiMap.end (), "unknown IMSI " << req.imsi); 
+-  uint16_t cellId = req.uli.gci;
++  uint16_t cellId = req.uli.cgi;
+   std::map<uint16_t, EnbInfo>::iterator enbit = m_enbInfoByCellId.find (cellId);
+   NS_ASSERT_MSG (enbit != m_enbInfoByCellId.end (), "unknown CellId " << cellId); 
+   Ipv4Address enbAddr = enbit->second.enbAddr;
+@@ -287,6 +288,8 @@ EpcSgwPgwApplication::DoCreateSessionReq
+       bearerContext.bearerLevelQos = bit->bearerLevelQos; 
+       bearerContext.tft = bit->tft;
+       res.bearerContextsCreated.push_back (bearerContext);
++
++      TeidDscpMapping::SetTeidDscpMapping (teid, bearerContext.bearerLevelQos.qci);
+     }
+   m_s11SapMme->CreateSessionResponse (res);
+   
+@@ -299,7 +302,7 @@ EpcSgwPgwApplication::DoModifyBearerRequ
+   uint64_t imsi = req.teid; // trick to avoid the need for allocating TEIDs on the S11 interface
+   std::map<uint64_t, Ptr<UeInfo> >::iterator ueit = m_ueInfoByImsiMap.find (imsi);
+   NS_ASSERT_MSG (ueit != m_ueInfoByImsiMap.end (), "unknown IMSI " << imsi); 
+-  uint16_t cellId = req.uli.gci;
++  uint16_t cellId = req.uli.cgi;
+   std::map<uint16_t, EnbInfo>::iterator enbit = m_enbInfoByCellId.find (cellId);
+   NS_ASSERT_MSG (enbit != m_enbInfoByCellId.end (), "unknown CellId " << cellId); 
+   Ipv4Address enbAddr = enbit->second.enbAddr;
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/model/epc-tft.cc ns-3.22/src/lte/model/epc-tft.cc
+--- ns-3.22-backup/src/lte/model/epc-tft.cc	2015-02-06 07:46:23.000000000 +0800
++++ ns-3.22/src/lte/model/epc-tft.cc	2016-10-10 22:48:30.420415046 +0800
+@@ -191,5 +191,28 @@ EpcTft::Matches (Direction direction,
+   return false;
+ }
+ 
++std::list<EpcTft::PacketFilter>
++EpcTft::GetFilters ()
++{
++  return m_filters;
++}
++
++uint8_t
++EpcTft::GetNumFilters ()
++{
++  return m_numFilters;
++}
++
++void
++EpcTft::SetFilters (std::list<PacketFilter> filters)
++{
++  m_filters = filters;
++}
++
++void
++EpcTft::SetNumFilters (uint8_t numFilters)
++{
++  m_numFilters = numFilters;
++}
+ 
+ } // namespace ns3
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/model/epc-tft.h ns-3.22/src/lte/model/epc-tft.h
+--- ns-3.22-backup/src/lte/model/epc-tft.h	2015-02-06 07:46:23.000000000 +0800
++++ ns-3.22/src/lte/model/epc-tft.h	2016-10-10 22:48:30.420415046 +0800
+@@ -150,6 +150,11 @@ public:
+ 		  uint16_t localPort,
+ 		  uint8_t typeOfService);
+ 
++    std::list<PacketFilter> GetFilters ();
++    uint8_t GetNumFilters ();
++    
++    void SetFilters (std::list<PacketFilter> filters);
++    void SetNumFilters (uint8_t numFilters);
+ 
+ private:
+ 
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/model/lte-enb-mac.cc ns-3.22/src/lte/model/lte-enb-mac.cc
+--- ns-3.22-backup/src/lte/model/lte-enb-mac.cc	2015-02-06 07:46:23.000000000 +0800
++++ ns-3.22/src/lte/model/lte-enb-mac.cc	2016-10-10 22:48:30.420415046 +0800
+@@ -34,9 +34,10 @@
+ #include <ns3/lte-radio-bearer-tag.h>
+ #include <ns3/lte-ue-phy.h>
+ 
+-#include "ns3/lte-mac-sap.h"
++#include <ns3/lte-mac-sap.h>
+ #include <ns3/lte-common.h>
+ 
++#include <ns3/lte-time-dilation-factor.h>
+ 
+ namespace ns3 {
+ 
+@@ -893,9 +894,10 @@ LteEnbMac::DoAllocateNcRaPreamble (uint1
+         {
+           found = true;
+           NcRaPreambleInfo preambleInfo;
+-          uint32_t expiryIntervalMs = (uint32_t) m_preambleTransMax * ((uint32_t) m_raResponseWindowSize + 5); 
+-          
+-          preambleInfo.expiryTime = Simulator::Now () + MilliSeconds (expiryIntervalMs);
++          uint32_t expiryIntervalMs = (uint32_t) m_preambleTransMax * ((uint32_t) m_raResponseWindowSize + 5);
++
++          uint16_t tdf = LteTimeDilationFactor::GetTimeDilationFactor ();
++          preambleInfo.expiryTime = Simulator::Now () + MilliSeconds (expiryIntervalMs * tdf);
+           preambleInfo.rnti = rnti;
+           NS_LOG_INFO ("allocated preamble for NC based RA: preamble " << preambleId << ", RNTI " << preambleInfo.rnti << ", exiryTime " << preambleInfo.expiryTime);
+           m_allocatedNcRaPreambleMap[preambleId] = preambleInfo; // create if not exist, update otherwise
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/model/lte-enb-phy.cc ns-3.22/src/lte/model/lte-enb-phy.cc
+--- ns-3.22-backup/src/lte/model/lte-enb-phy.cc	2015-02-06 07:46:22.000000000 +0800
++++ ns-3.22/src/lte/model/lte-enb-phy.cc	2016-10-10 22:48:30.420415046 +0800
+@@ -27,7 +27,6 @@
+ #include <ns3/attribute-accessor-helper.h>
+ #include <ns3/double.h>
+ 
+-
+ #include "lte-enb-phy.h"
+ #include "lte-ue-phy.h"
+ #include "lte-net-device.h"
+@@ -45,6 +44,8 @@
+ #include <ns3/lte-ue-net-device.h>
+ #include <ns3/pointer.h>
+ 
++#include <ns3/lte-time-dilation-factor.h>
++
+ namespace ns3 {
+ 
+ NS_LOG_COMPONENT_DEFINE ("LteEnbPhy");
+@@ -57,7 +58,7 @@ NS_OBJECT_ENSURE_REGISTERED (LteEnbPhy);
+  * Data portion is fixed to 11 symbols out of the available 14 symbols.
+  * 1 nanosecond margin is added to avoid overlapping simulator events.
+  */
+-static const Time DL_DATA_DURATION = NanoSeconds (785714 -1);
++static const Time DL_DATA_DURATION = NanoSeconds (785714 - 1);
+ 
+ /**
+  * Delay from the start of a DL subframe to transmission of the data portion.
+@@ -731,9 +732,10 @@ LteEnbPhy::StartSubFrame (void)
+   Ptr<PacketBurst> pb = GetPacketBurst ();
+   if (pb)
+     {
+-      Simulator::Schedule (DL_CTRL_DELAY_FROM_SUBFRAME_START, // ctrl frame fixed to 3 symbols
++      uint16_t tdf = LteTimeDilationFactor::GetTimeDilationFactor ();
++      Simulator::Schedule (DL_CTRL_DELAY_FROM_SUBFRAME_START * tdf, // ctrl frame fixed to 3 symbols
+                            &LteEnbPhy::SendDataChannels,
+-                           this,pb);
++                           this, pb);
+     }
+ 
+   // trigger the MAC
+@@ -775,7 +777,8 @@ LteEnbPhy::SendDataChannels (Ptr<PacketB
+   NS_LOG_LOGIC (this << " eNB start TX DATA");
+   std::list<Ptr<LteControlMessage> > ctrlMsgList;
+   ctrlMsgList.clear ();
+-  m_downlinkSpectrumPhy->StartTxDataFrame (pb, ctrlMsgList, DL_DATA_DURATION);
++  uint16_t tdf = LteTimeDilationFactor::GetTimeDilationFactor ();
++  m_downlinkSpectrumPhy->StartTxDataFrame (pb, ctrlMsgList, DL_DATA_DURATION * tdf);
+ }
+ 
+ 
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/model/lte-enb-rrc.cc ns-3.22/src/lte/model/lte-enb-rrc.cc
+--- ns-3.22-backup/src/lte/model/lte-enb-rrc.cc	2015-02-06 07:46:22.000000000 +0800
++++ ns-3.22/src/lte/model/lte-enb-rrc.cc	2016-10-10 22:48:30.420415046 +0800
+@@ -41,8 +41,8 @@
+ #include <ns3/lte-rlc-am.h>
+ #include <ns3/lte-pdcp.h>
+ 
+-
+-
++#include <ns3/lte-time-dilation-factor.h>
++#include <ctime>
+ 
+ namespace ns3 {
+ 
+@@ -800,6 +800,13 @@ void
+ UeManager::RecvRrcConnectionRequest (LteRrcSap::RrcConnectionRequest msg)
+ {
+   NS_LOG_FUNCTION (this);
++
++  /**/
++  struct timespec ts;
++  clock_gettime (CLOCK_REALTIME, &ts);
++  NS_LOG_LOGIC ("clock_gettime () " << ts.tv_sec << " "<< ts.tv_nsec);
++  /**/
++
+   switch (m_state)
+     {
+     case INITIAL_RANDOM_ACCESS:
+@@ -894,6 +901,13 @@ UeManager::RecvRrcConnectionReconfigurat
+         }
+       SwitchToState (CONNECTED_NORMALLY);
+       m_rrc->m_connectionReconfigurationTrace (m_imsi, m_rrc->m_cellId, m_rnti);
++
++      /**/
++      struct timespec ts;
++      clock_gettime (CLOCK_REALTIME, &ts);
++      NS_LOG_LOGIC ("clock_gettime () " << ts.tv_sec << " "<< ts.tv_nsec);
++      /**/
++
+       break;
+ 
+     // This case is added to NS-3 in order to handle bearer de-activation scenario for CONNECTED state UE
+@@ -1372,7 +1386,7 @@ LteEnbRrc::GetTypeId (void)
+     .AddAttribute ("SrsPeriodicity",
+                    "The SRS periodicity in milliseconds",
+                    UintegerValue (40),
+-                   MakeUintegerAccessor (&LteEnbRrc::SetSrsPeriodicity, 
++                   MakeUintegerAccessor (&LteEnbRrc::SetSrsPeriodicity,
+                                          &LteEnbRrc::GetSrsPeriodicity),
+                    MakeUintegerChecker<uint32_t> ())
+ 
+@@ -1777,7 +1791,8 @@ LteEnbRrc::ConfigureCell (uint8_t ulBand
+    * regularly transmitted every 80 ms by default (set the
+    * SystemInformationPeriodicity attribute to configure this).
+    */
+-  Simulator::Schedule (MilliSeconds (16), &LteEnbRrc::SendSystemInformation, this);
++  uint16_t tdf = LteTimeDilationFactor::GetTimeDilationFactor ();
++  Simulator::Schedule (MilliSeconds (16 * tdf), &LteEnbRrc::SendSystemInformation, this);
+ 
+   m_configured = true;
+ 
+@@ -2353,13 +2368,13 @@ static const uint8_t SRS_ENTRIES = 9;
+  * Sounding Reference Symbol (SRS) periodicity (TSRS) in milliseconds. Taken
+  * from 3GPP TS 36.213 Table 8.2-1. Index starts from 1.
+  */
+-static const uint16_t g_srsPeriodicity[SRS_ENTRIES] = {0, 2, 5, 10, 20, 40,  80, 160, 320};
++static const uint16_t g_srsPeriodicity[SRS_ENTRIES] = {0, 2, 5, 10, 20, 40, 80, 160, 320};
+ /**
+  * The lower bound (inclusive) of the SRS configuration indices (ISRS) which
+  * use the corresponding SRS periodicity (TSRS). Taken from 3GPP TS 36.213
+  * Table 8.2-1. Index starts from 1.
+  */
+-static const uint16_t g_srsCiLow[SRS_ENTRIES] =       {0, 0, 2,  7, 17, 37,  77, 157, 317};
++static const uint16_t g_srsCiLow[SRS_ENTRIES] =       {0, 0, 2, 7, 17, 37, 77, 157, 317};
+ /**
+  * The upper bound (inclusive) of the SRS configuration indices (ISRS) which
+  * use the corresponding SRS periodicity (TSRS). Taken from 3GPP TS 36.213
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/model/lte-phy.cc ns-3.22/src/lte/model/lte-phy.cc
+--- ns-3.22-backup/src/lte/model/lte-phy.cc	2015-02-06 07:46:22.000000000 +0800
++++ ns-3.22/src/lte/model/lte-phy.cc	2016-10-10 22:48:30.420415046 +0800
+@@ -28,13 +28,14 @@
+ #include "lte-phy.h"
+ #include "lte-net-device.h"
+ 
++#include <ns3/lte-time-dilation-factor.h>
++
+ namespace ns3 {
+ 
+ NS_LOG_COMPONENT_DEFINE ("LtePhy");
+ 
+ NS_OBJECT_ENSURE_REGISTERED (LtePhy);
+ 
+-
+ LtePhy::LtePhy ()
+ {
+   NS_LOG_FUNCTION (this);
+@@ -52,9 +53,10 @@ LtePhy::LtePhy (Ptr<LteSpectrumPhy> dlPh
+     m_cellId (0)
+ {
+   NS_LOG_FUNCTION (this);
++  uint16_t tdf = LteTimeDilationFactor::GetTimeDilationFactor ();
++  m_tti = m_tti * tdf;
+ }
+ 
+-
+ TypeId
+ LtePhy::GetTypeId (void)
+ {
+@@ -64,7 +66,6 @@ LtePhy::GetTypeId (void)
+   return tid;
+ }
+ 
+-
+ LtePhy::~LtePhy ()
+ {
+   NS_LOG_FUNCTION (this);
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/model/lte-rlc-um.cc ns-3.22/src/lte/model/lte-rlc-um.cc
+--- ns-3.22-backup/src/lte/model/lte-rlc-um.cc	2015-02-06 07:46:22.000000000 +0800
++++ ns-3.22/src/lte/model/lte-rlc-um.cc	2016-10-10 22:48:30.420415046 +0800
+@@ -26,6 +26,8 @@
+ #include "ns3/lte-rlc-sdu-status-tag.h"
+ #include "ns3/lte-rlc-tag.h"
+ 
++#include <ns3/lte-time-dilation-factor.h>
++
+ namespace ns3 {
+ 
+ NS_LOG_COMPONENT_DEFINE ("LteRlcUm");
+@@ -387,7 +389,8 @@ LteRlcUm::DoNotifyTxOpportunity (uint32_
+   if (! m_txBuffer.empty ())
+     {
+       m_rbsTimer.Cancel ();
+-      m_rbsTimer = Simulator::Schedule (MilliSeconds (10), &LteRlcUm::ExpireRbsTimer, this);
++      uint16_t tdf = LteTimeDilationFactor::GetTimeDilationFactor ();
++      m_rbsTimer = Simulator::Schedule (MilliSeconds (10 * tdf), &LteRlcUm::ExpireRbsTimer, this);
+     }
+ }
+ 
+@@ -550,7 +553,9 @@ LteRlcUm::DoReceivePdu (Ptr<Packet> p)
+         {
+           NS_LOG_LOGIC ("VR(UH) > VR(UR)");
+           NS_LOG_LOGIC ("Start reordering timer");
+-          m_reorderingTimer = Simulator::Schedule (Time ("0.1s"),
++
++          uint16_t tdf = LteTimeDilationFactor::GetTimeDilationFactor ();
++          m_reorderingTimer = Simulator::Schedule (Seconds (0.1  * tdf),
+                                                    &LteRlcUm::ExpireReorderingTimer ,this);
+           m_vrUx = m_vrUh;
+           NS_LOG_LOGIC ("New VR(UX) = " << m_vrUx);
+@@ -1167,7 +1172,8 @@ LteRlcUm::ExpireReorderingTimer (void)
+   if ( m_vrUh > m_vrUr)
+     {
+       NS_LOG_LOGIC ("Start reordering timer");
+-      m_reorderingTimer = Simulator::Schedule (Time ("0.1s"),
++      uint16_t tdf = LteTimeDilationFactor::GetTimeDilationFactor ();
++      m_reorderingTimer = Simulator::Schedule (Seconds (0.1 * tdf),
+                                                &LteRlcUm::ExpireReorderingTimer, this);
+       m_vrUx = m_vrUh;
+       NS_LOG_LOGIC ("New VR(UX) = " << m_vrUx);
+@@ -1183,7 +1189,8 @@ LteRlcUm::ExpireRbsTimer (void)
+   if (! m_txBuffer.empty ())
+     {
+       DoReportBufferStatus ();
+-      m_rbsTimer = Simulator::Schedule (MilliSeconds (10), &LteRlcUm::ExpireRbsTimer, this);
++      uint16_t tdf = LteTimeDilationFactor::GetTimeDilationFactor ();
++      m_rbsTimer = Simulator::Schedule (MilliSeconds (10 * tdf), &LteRlcUm::ExpireRbsTimer, this);
+     }
+ }
+ 
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/model/lte-spectrum-phy.cc ns-3.22/src/lte/model/lte-spectrum-phy.cc
+--- ns-3.22-backup/src/lte/model/lte-spectrum-phy.cc	2015-02-06 07:46:22.000000000 +0800
++++ ns-3.22/src/lte/model/lte-spectrum-phy.cc	2016-10-10 22:48:30.420415046 +0800
+@@ -39,6 +39,8 @@
+ #include <ns3/double.h>
+ #include <ns3/config.h>
+ 
++#include <ns3/lte-time-dilation-factor.h>
++
+ namespace ns3 {
+ 
+ NS_LOG_COMPONENT_DEFINE ("LteSpectrumPhy");
+@@ -46,7 +48,7 @@ NS_LOG_COMPONENT_DEFINE ("LteSpectrumPhy
+ 
+ // duration of SRS portion of UL subframe  
+ // = 1 symbol for SRS -1ns as margin to avoid overlapping simulator events
+-static const Time UL_SRS_DURATION = NanoSeconds (71429 -1);  
++static const Time UL_SRS_DURATION = NanoSeconds (71429 -1);
+ 
+ // duration of the control portion of a subframe
+ // = 0.001 / 14 * 3 (ctrl fixed to 3 symbols) -1ns as margin to avoid overlapping simulator events
+@@ -514,8 +516,10 @@ LteSpectrumPhy::StartTxDlCtrlFrame (std:
+       ChangeState (TX);
+       NS_ASSERT (m_channel);
+ 
++      uint16_t tdf = LteTimeDilationFactor::GetTimeDilationFactor ();
++
+       Ptr<LteSpectrumSignalParametersDlCtrlFrame> txParams = Create<LteSpectrumSignalParametersDlCtrlFrame> ();
+-      txParams->duration = DL_CTRL_DURATION;
++      txParams->duration = DL_CTRL_DURATION * tdf;
+       txParams->txPhy = GetObject<SpectrumPhy> ();
+       txParams->txAntenna = m_antenna;
+       txParams->psd = m_txPsd;
+@@ -523,7 +527,7 @@ LteSpectrumPhy::StartTxDlCtrlFrame (std:
+       txParams->pss = pss;
+       txParams->ctrlMsgList = ctrlMsgList;
+       m_channel->StartTx (txParams);
+-      m_endTxEvent = Simulator::Schedule (DL_CTRL_DURATION, &LteSpectrumPhy::EndTx, this);
++      m_endTxEvent = Simulator::Schedule (DL_CTRL_DURATION * tdf, &LteSpectrumPhy::EndTx, this);
+     }
+     return false;
+     break;
+@@ -564,6 +568,8 @@ LteSpectrumPhy::StartTxUlSrsFrame ()
+       */
+       NS_ASSERT (m_txPsd);
+       NS_LOG_LOGIC (this << " m_txPsd: " << *m_txPsd);
++
++      uint16_t tdf = LteTimeDilationFactor::GetTimeDilationFactor ();
+       
+       // we need to convey some PHY meta information to the receiver
+       // to be used for simulation purposes (e.g., the CellId). This
+@@ -572,13 +578,13 @@ LteSpectrumPhy::StartTxUlSrsFrame ()
+       ChangeState (TX);
+       NS_ASSERT (m_channel);
+       Ptr<LteSpectrumSignalParametersUlSrsFrame> txParams = Create<LteSpectrumSignalParametersUlSrsFrame> ();
+-      txParams->duration = UL_SRS_DURATION;
++      txParams->duration = UL_SRS_DURATION * tdf;
+       txParams->txPhy = GetObject<SpectrumPhy> ();
+       txParams->txAntenna = m_antenna;
+       txParams->psd = m_txPsd;
+       txParams->cellId = m_cellId;
+       m_channel->StartTx (txParams);
+-      m_endTxEvent = Simulator::Schedule (UL_SRS_DURATION, &LteSpectrumPhy::EndTx, this);
++      m_endTxEvent = Simulator::Schedule (UL_SRS_DURATION * tdf, &LteSpectrumPhy::EndTx, this);
+     }
+     return false;
+     break;
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/model/lte-time-dilation-factor.cc ns-3.22/src/lte/model/lte-time-dilation-factor.cc
+--- ns-3.22-backup/src/lte/model/lte-time-dilation-factor.cc	1970-01-01 08:00:00.000000000 +0800
++++ ns-3.22/src/lte/model/lte-time-dilation-factor.cc	2016-09-22 23:09:33.201596647 +0800
+@@ -0,0 +1,71 @@
++#include <ns3/lte-time-dilation-factor.h>
++#include <ns3/singleton.h>
++#include <ns3/core-module.h>
++#include <ns3/log.h>
++
++namespace ns3 {
++
++NS_LOG_COMPONENT_DEFINE ("LteTimeDilationFactor");
++
++class LteTimeDilationFactorImpl
++{
++public:
++
++  LteTimeDilationFactorImpl (void);
++  void SetTimeDilationFactor (uint16_t tdf);
++  uint16_t GetTimeDilationFactor (void);
++
++private:
++
++  uint16_t m_timeDilationFactor;
++};
++
++LteTimeDilationFactorImpl::LteTimeDilationFactorImpl (void)
++{
++  SetTimeDilationFactor (1);
++}
++
++void
++LteTimeDilationFactorImpl::SetTimeDilationFactor (uint16_t tdf)
++{
++  m_timeDilationFactor = tdf;
++
++  uint32_t srs = 40 * tdf;
++  if (srs > 320)
++    {
++      srs = 320;
++    }
++
++  Config::SetDefault ("ns3::LteEnbRrc::SystemInformationPeriodicity",  TimeValue (MilliSeconds (80 * tdf)));
++  Config::SetDefault ("ns3::LteEnbRrc::SrsPeriodicity", UintegerValue (srs));
++  Config::SetDefault ("ns3::LteEnbRrc::ConnectionRequestTimeoutDuration", TimeValue (MilliSeconds (15 * tdf)));
++  Config::SetDefault ("ns3::LteEnbRrc::ConnectionSetupTimeoutDuration", TimeValue (MilliSeconds (150 * tdf)));
++  Config::SetDefault ("ns3::LteEnbRrc::ConnectionRejectedTimeoutDuration", TimeValue (MilliSeconds (30 * tdf)));
++  Config::SetDefault ("ns3::LteEnbRrc::HandoverJoiningTimeoutDuration", TimeValue (MilliSeconds (200 * tdf)));
++  Config::SetDefault ("ns3::LteEnbRrc::HandoverLeavingTimeoutDuration", TimeValue (MilliSeconds (500 * tdf)));
++  Config::SetDefault ("ns3::LteUeRrc::T300", TimeValue (MilliSeconds (100 * tdf)));
++}
++
++uint16_t
++LteTimeDilationFactorImpl::GetTimeDilationFactor (void)
++{
++  return m_timeDilationFactor;
++}
++
++namespace LteTimeDilationFactor {
++
++void
++SetTimeDilationFactor (uint16_t tdf)
++{
++  Singleton<LteTimeDilationFactorImpl>::Get ()->SetTimeDilationFactor (tdf);
++}
++
++uint16_t
++GetTimeDilationFactor (void)
++{
++  return Singleton<LteTimeDilationFactorImpl>::Get ()->GetTimeDilationFactor ();
++}
++
++}
++
++}
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/model/lte-time-dilation-factor.h ns-3.22/src/lte/model/lte-time-dilation-factor.h
+--- ns-3.22-backup/src/lte/model/lte-time-dilation-factor.h	1970-01-01 08:00:00.000000000 +0800
++++ ns-3.22/src/lte/model/lte-time-dilation-factor.h	2016-09-22 23:09:33.201596647 +0800
+@@ -0,0 +1,18 @@
++#ifndef LTE_TIME_DILATION_FACTOR_H
++#define LTE_TIME_DILATION_FACTOR_H
++
++#include <ns3/object.h>
++#include <stdint.h>
++
++namespace ns3 {
++
++namespace LteTimeDilationFactor {
++
++  void SetTimeDilationFactor (uint16_t tdf);
++  uint16_t GetTimeDilationFactor (void);
++
++}
++
++}
++
++#endif
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/model/lte-ue-mac.cc ns-3.22/src/lte/model/lte-ue-mac.cc
+--- ns-3.22-backup/src/lte/model/lte-ue-mac.cc	2015-02-06 07:46:22.000000000 +0800
++++ ns-3.22/src/lte/model/lte-ue-mac.cc	2016-10-10 22:48:30.420415046 +0800
+@@ -35,7 +35,7 @@
+ #include <ns3/simulator.h>
+ #include <ns3/lte-common.h>
+ 
+-
++#include <ns3/lte-time-dilation-factor.h>
+ 
+ namespace ns3 {
+ 
+@@ -388,8 +388,9 @@ LteUeMac::SendRaPreamble (bool contentio
+   m_uePhySapProvider->SendRachPreamble (m_raPreambleId, m_raRnti);
+   NS_LOG_INFO (this << " sent preamble id " << (uint32_t) m_raPreambleId << ", RA-RNTI " << (uint32_t) m_raRnti);
+   // 3GPP 36.321 5.1.4 
+-  Time raWindowBegin = MilliSeconds (3); 
+-  Time raWindowEnd = MilliSeconds (3 + m_rachConfig.raResponseWindowSize);
++  uint16_t tdf = LteTimeDilationFactor::GetTimeDilationFactor ();
++  Time raWindowBegin = MilliSeconds (3 * tdf);
++  Time raWindowEnd = MilliSeconds ((3 * tdf) + (m_rachConfig.raResponseWindowSize * tdf));
+   Simulator::Schedule (raWindowBegin, &LteUeMac::StartWaitingForRaResponse, this);
+   m_noRaResponseReceivedEvent = Simulator::Schedule (raWindowEnd, &LteUeMac::RaResponseTimeout, this, contention);
+ }
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/model/lte-ue-net-device.cc ns-3.22/src/lte/model/lte-ue-net-device.cc
+--- ns-3.22-backup/src/lte/model/lte-ue-net-device.cc	2015-02-06 07:46:22.000000000 +0800
++++ ns-3.22/src/lte/model/lte-ue-net-device.cc	2016-10-10 22:48:30.420415046 +0800
+@@ -154,7 +154,33 @@ LteUeNetDevice::UpdateConfig (void)
+     }
+ }
+ 
++void
++LteUeNetDevice::SetMacAddress (Address address)
++{
++  NS_LOG_FUNCTION (this << address);
++  m_macAddress = Mac48Address::ConvertFrom (address);
++}
++
++void
++LteUeNetDevice::SetGatewayMacAddress (Address address)
++{
++  NS_LOG_FUNCTION (this << address);
++  m_gatewayMacAddress = Mac48Address::ConvertFrom (address);
++}
++
++Address
++LteUeNetDevice::GetMacAddress (void) const
++{
++  NS_LOG_FUNCTION (this);
++  return m_macAddress;
++}
+ 
++Address
++LteUeNetDevice::GetGatewayMacAddress (void) const
++{
++  NS_LOG_FUNCTION (this);
++  return m_gatewayMacAddress;
++}
+ 
+ Ptr<LteUeMac>
+ LteUeNetDevice::GetMac (void) const
+@@ -260,5 +286,22 @@ LteUeNetDevice::Send (Ptr<Packet> packet
+   return m_nas->Send (packet);
+ }
+ 
++void
++LteUeNetDevice::SetPromiscReceiveCallback (PromiscReceiveCallback cb)
++{
++  NS_LOG_FUNCTION (this);
++  m_promiscRxCallback = cb;
++}
++
++void
++LteUeNetDevice::Receive (Ptr<Packet> p)
++{
++  NS_LOG_FUNCTION (this << p);
++  m_rxCallback (this, p, Ipv4L3Protocol::PROT_NUMBER, Address ());
++  if (!m_promiscRxCallback.IsNull ())
++  {
++    m_promiscRxCallback (this, p, Ipv4L3Protocol::PROT_NUMBER, GetGatewayMacAddress (), GetMacAddress(), PACKET_HOST);
++  }
++}
+ 
+ } // namespace ns3
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/model/lte-ue-net-device.h ns-3.22/src/lte/model/lte-ue-net-device.h
+--- ns-3.22-backup/src/lte/model/lte-ue-net-device.h	2015-02-06 07:46:22.000000000 +0800
++++ ns-3.22/src/lte/model/lte-ue-net-device.h	2016-10-10 22:48:30.424415016 +0800
+@@ -58,10 +58,15 @@ public:
+   virtual ~LteUeNetDevice (void);
+   virtual void DoDispose ();
+ 
+-
+   // inherited from NetDevice
+   virtual bool Send (Ptr<Packet> packet, const Address& dest, uint16_t protocolNumber);
+ 
++  virtual void SetMacAddress (Address address);
++  virtual void SetGatewayMacAddress (Address address);
++  virtual Address GetMacAddress (void) const;
++  virtual Address GetGatewayMacAddress (void) const;
++  virtual void SetPromiscReceiveCallback (PromiscReceiveCallback cb);
++  virtual void Receive (Ptr<Packet> p);
+ 
+   Ptr<LteUeMac> GetMac (void) const;
+ 
+@@ -153,6 +158,10 @@ private:
+ 
+   uint32_t m_csgId;
+ 
++  Mac48Address m_macAddress;
++  Mac48Address m_gatewayMacAddress;
++  NetDevice::PromiscReceiveCallback m_promiscRxCallback;
++
+ }; // end of class LteUeNetDevice
+ 
+ } // namespace ns3
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/model/lte-ue-phy.cc ns-3.22/src/lte/model/lte-ue-phy.cc
+--- ns-3.22-backup/src/lte/model/lte-ue-phy.cc	2015-02-06 07:46:22.000000000 +0800
++++ ns-3.22/src/lte/model/lte-ue-phy.cc	2016-10-10 22:48:30.424415016 +0800
+@@ -41,6 +41,8 @@
+ #include <ns3/boolean.h>
+ #include <ns3/lte-ue-power-control.h>
+ 
++#include <ns3/lte-time-dilation-factor.h>
++
+ namespace ns3 {
+ 
+ NS_LOG_COMPONENT_DEFINE ("LteUePhy");
+@@ -54,16 +56,13 @@ NS_LOG_COMPONENT_DEFINE ("LteUePhy");
+  * events. The duration of one symbol is TTI/14 (rounded). In other words,
+  * duration of data portion of UL subframe = 1 ms * (13/14) - 1 ns.
+  */
+-static const Time UL_DATA_DURATION = NanoSeconds (1e6 - 71429 - 1); 
++static const Time UL_DATA_DURATION = NanoSeconds (1e6 - 71429 - 1);
+ 
+ /**
+  * Delay from subframe start to transmission of SRS.
+  * Equals to "TTI length - 1 symbol for SRS".
+  */
+-static const Time UL_SRS_DELAY_FROM_SUBFRAME_START = NanoSeconds (1e6 - 71429); 
+-
+-
+-
++static const Time UL_SRS_DELAY_FROM_SUBFRAME_START = NanoSeconds (1e6 - 71429);
+ 
+ ////////////////////////////////////////
+ // member SAP forwarders
+@@ -154,6 +153,10 @@ LteUePhy::LteUePhy (Ptr<LteSpectrumPhy>
+     m_ueMeasurementsFilterLast (MilliSeconds (0)),
+     m_rsrpSinrSampleCounter (0)
+ {
++  uint16_t tdf = LteTimeDilationFactor::GetTimeDilationFactor ();
++  m_p10CqiPeriocity = m_p10CqiPeriocity * tdf;
++  m_a30CqiPeriocity = m_a30CqiPeriocity * tdf;
++
+   m_amc = CreateObject <LteAmc> ();
+   m_powerControl = CreateObject <LteUePowerControl> ();
+   m_uePhySapProvider = new UeMemberLteUePhySapProvider (this);
+@@ -1077,7 +1080,8 @@ LteUePhy::SubframeIndication (uint32_t f
+           if ((((frameNo-1)*10 + (subframeNo-1)) % m_srsPeriodicity) == m_srsSubframeOffset)
+             {
+               NS_LOG_INFO ("frame " << frameNo << " subframe " << subframeNo << " sending SRS (offset=" << m_srsSubframeOffset << ", period=" << m_srsPeriodicity << ")");
+-              m_sendSrsEvent = Simulator::Schedule (UL_SRS_DELAY_FROM_SUBFRAME_START, 
++              uint16_t tdf = LteTimeDilationFactor::GetTimeDilationFactor ();
++              m_sendSrsEvent = Simulator::Schedule (UL_SRS_DELAY_FROM_SUBFRAME_START * tdf,
+                                                     &LteUePhy::SendSrs,
+                                                     this);
+             }
+@@ -1095,7 +1099,8 @@ LteUePhy::SubframeIndication (uint32_t f
+               m_txPower = m_powerControl->GetPuschTxPower (rbMask);
+               SetSubChannelsForTransmission (rbMask);
+             }
+-          m_uplinkSpectrumPhy->StartTxDataFrame (pb, ctrlMsg, UL_DATA_DURATION);
++          uint16_t tdf = LteTimeDilationFactor::GetTimeDilationFactor ();
++          m_uplinkSpectrumPhy->StartTxDataFrame (pb, ctrlMsg, UL_DATA_DURATION * tdf);
+         }
+       else
+         {
+@@ -1111,7 +1116,8 @@ LteUePhy::SubframeIndication (uint32_t f
+                 }
+ 
+               SetSubChannelsForTransmission (dlRb);
+-              m_uplinkSpectrumPhy->StartTxDataFrame (pb, ctrlMsg, UL_DATA_DURATION);
++              uint16_t tdf = LteTimeDilationFactor::GetTimeDilationFactor ();
++              m_uplinkSpectrumPhy->StartTxDataFrame (pb, ctrlMsg, UL_DATA_DURATION * tdf);
+             }
+           else
+             {
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/model/lte-ue-rrc.cc ns-3.22/src/lte/model/lte-ue-rrc.cc
+--- ns-3.22-backup/src/lte/model/lte-ue-rrc.cc	2015-02-06 07:46:22.000000000 +0800
++++ ns-3.22/src/lte/model/lte-ue-rrc.cc	2016-10-10 22:48:30.424415016 +0800
+@@ -34,6 +34,8 @@
+ #include <ns3/lte-pdcp.h>
+ #include <ns3/lte-radio-bearer-info.h>
+ 
++#include <ns3/lte-time-dilation-factor.h>
++
+ #include <cmath>
+ 
+ namespace ns3 {
+@@ -2474,7 +2476,7 @@ LteUeRrc::VarMeasReportListAdd (uint8_t
+   NS_ASSERT (!measReportIt->second.cellsTriggeredList.empty ());
+   measReportIt->second.numberOfReportsSent = 0;
+   measReportIt->second.periodicReportTimer
+-    = Simulator::Schedule (UE_MEASUREMENT_REPORT_DELAY,
++      = Simulator::Schedule (UE_MEASUREMENT_REPORT_DELAY,
+                            &LteUeRrc::SendMeasurementReport,
+                            this, measId);
+ 
+@@ -2736,9 +2738,10 @@ LteUeRrc::SendMeasurementReport (uint8_t
+           break;
+         }
+ 
++      uint16_t tdf = LteTimeDilationFactor::GetTimeDilationFactor ();
+       // schedule the next measurement reporting
+       measReportIt->second.periodicReportTimer 
+-        = Simulator::Schedule (reportInterval,
++          = Simulator::Schedule (reportInterval * tdf,
+                                &LteUeRrc::SendMeasurementReport,
+                                this, measId);
+ 
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/model/tap-epc-enb-application.cc ns-3.22/src/lte/model/tap-epc-enb-application.cc
+--- ns-3.22-backup/src/lte/model/tap-epc-enb-application.cc	1970-01-01 08:00:00.000000000 +0800
++++ ns-3.22/src/lte/model/tap-epc-enb-application.cc	2016-09-22 23:09:33.201596647 +0800
+@@ -0,0 +1,423 @@
++/* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
++/*
++ * Copyright (c) 2011 Centre Tecnologic de Telecomunicacions de Catalunya (CTTC)
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation;
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ * Author: Jaume Nin <jnin@cttc.cat>
++ *         Nicola Baldo <nbaldo@cttc.cat>
++ */
++
++
++#include <ns3/tap-epc-enb-application.h>
++#include <ns3/log.h>
++#include <ns3/mac48-address.h>
++#include <ns3/ipv4.h>
++#include <ns3/inet-socket-address.h>
++#include <ns3/uinteger.h>
++
++#include <ns3/epc-gtpu-header.h>
++#include <ns3/eps-bearer-tag.h>
++#include "ns3/teid-dscp-mapping.h"
++
++namespace ns3 {
++
++NS_LOG_COMPONENT_DEFINE ("TapEpcEnbApplication");
++
++TapEpcEnbApplication::EpsFlowId_t::EpsFlowId_t ()
++{
++}
++
++TapEpcEnbApplication::EpsFlowId_t::EpsFlowId_t (const uint16_t a, const uint8_t b)
++  : m_rnti (a),
++    m_bid (b)
++{
++}
++
++bool
++operator == (const TapEpcEnbApplication::EpsFlowId_t &a, const TapEpcEnbApplication::EpsFlowId_t &b)
++{
++  return ( (a.m_rnti == b.m_rnti) && (a.m_bid == b.m_bid) );
++}
++
++bool
++operator < (const TapEpcEnbApplication::EpsFlowId_t& a, const TapEpcEnbApplication::EpsFlowId_t& b)
++{
++  return ( (a.m_rnti < b.m_rnti) || ( (a.m_rnti == b.m_rnti) && (a.m_bid < b.m_bid) ) );
++}
++
++TypeId
++TapEpcEnbApplication::GetTypeId (void)
++{
++  static TypeId tid = TypeId ("ns3::TapEpcEnbApplication")
++    .SetParent<Object> ();
++  return tid;
++}
++
++void
++TapEpcEnbApplication::DoDispose (void)
++{
++  NS_LOG_FUNCTION (this);
++  m_lteSocket = 0;
++  m_s1uSocket = 0;
++  m_s1apSocket = 0;
++  delete m_s1SapProvider;
++  delete m_s1apSapEnb;
++}
++
++TapEpcEnbApplication::TapEpcEnbApplication (Ptr<Socket> lteSocket, Ptr<Socket> s1uSocket, Ptr<Socket> s1apSocket, Ipv4Address enbS1uAddress, Ipv4Address sgwS1uAddress, uint16_t cellId)
++  : m_lteSocket (lteSocket),
++    m_s1uSocket (s1uSocket),
++    m_s1apSocket (s1apSocket),
++    m_enbS1uAddress (enbS1uAddress),
++    m_sgwS1uAddress (sgwS1uAddress),
++    m_gtpuUdpPort (2152), // fixed by the standard
++    m_s1SapUser (0),
++    m_cellId (cellId)
++{
++  NS_LOG_FUNCTION (this << lteSocket << s1uSocket << sgwS1uAddress);
++  m_s1uSocket->SetRecvCallback (MakeCallback (&TapEpcEnbApplication::RecvFromS1uSocket, this));
++  m_lteSocket->SetRecvCallback (MakeCallback (&TapEpcEnbApplication::RecvFromLteSocket, this));
++  m_s1apSocket->SetRecvCallback (MakeCallback (&TapEpcEnbApplication::RecvFromS1apSocket, this));
++  m_s1SapProvider = new MemberEpcEnbS1SapProvider<TapEpcEnbApplication> (this);
++  m_s1apSapEnb = new MemberEpcS1apSapEnb<TapEpcEnbApplication> (this);
++}
++
++TapEpcEnbApplication::~TapEpcEnbApplication (void)
++{
++  NS_LOG_FUNCTION (this);
++}
++
++void 
++TapEpcEnbApplication::SetS1SapUser (EpcEnbS1SapUser * s)
++{
++  m_s1SapUser = s;
++}
++
++EpcEnbS1SapProvider* 
++TapEpcEnbApplication::GetS1SapProvider ()
++{
++  return m_s1SapProvider;
++}
++
++EpcS1apSapEnb* 
++TapEpcEnbApplication::GetS1apSapEnb ()
++{
++  return m_s1apSapEnb;
++}
++
++void 
++TapEpcEnbApplication::DoInitialUeMessage (uint64_t imsi, uint16_t rnti)
++{
++  NS_LOG_FUNCTION (this);
++  // side effect: create entry if not exist
++  m_imsiRntiMap[imsi] = rnti;
++  
++  EpcS1apHeader epcS1apHeader;
++  epcS1apHeader.SetProcedureCode (EpcS1apHeader::InitialUeMessage);
++  epcS1apHeader.SetTypeOfMessage (EpcS1apHeader::InitiatingMessage);
++  
++  InitialUeRequestHeader initialUeRequestHeader;
++  initialUeRequestHeader.SetMmeUeS1Id (imsi);
++  initialUeRequestHeader.SetEnbUeS1Id (rnti);
++  initialUeRequestHeader.SetStmsi (imsi);
++  initialUeRequestHeader.SetEcgi (m_cellId);
++  
++  Ptr<Packet> packet = Create<Packet> ();
++  packet->AddHeader (initialUeRequestHeader);
++  packet->AddHeader (epcS1apHeader);
++  SendToS1apSocket (packet);
++}
++
++void 
++TapEpcEnbApplication::DoPathSwitchRequest (EpcEnbS1SapProvider::PathSwitchRequestParameters params)
++{
++  NS_LOG_FUNCTION (this);
++  uint16_t enbUeS1Id = params.rnti;  
++  uint64_t mmeUeS1Id = params.mmeUeS1Id;
++  uint64_t imsi = mmeUeS1Id;
++  // side effect: create entry if not exist
++  m_imsiRntiMap[imsi] = params.rnti;
++
++  uint16_t cgi = params.cellId;
++  std::list<EpcS1apSapMme::ErabSwitchedInDownlinkItem> erabToBeSwitchedInDownlinkList;
++  for (std::list<EpcEnbS1SapProvider::BearerToBeSwitched>::iterator bit = params.bearersToBeSwitched.begin ();
++       bit != params.bearersToBeSwitched.end ();
++       ++bit)
++    {
++      EpsFlowId_t flowId;
++      flowId.m_rnti = params.rnti;
++      flowId.m_bid = bit->epsBearerId;
++      uint32_t teid = bit->teid;
++      
++      EpsFlowId_t rbid (params.rnti, bit->epsBearerId);
++      // side effect: create entries if not exist
++      m_rbidTeidMap[params.rnti][bit->epsBearerId] = teid;
++      m_teidRbidMap[teid] = rbid;
++
++      EpcS1apSapMme::ErabSwitchedInDownlinkItem erab;
++      erab.erabId = bit->epsBearerId;
++      erab.enbTransportLayerAddress = m_enbS1uAddress;
++      erab.enbTeid = bit->teid;
++
++      erabToBeSwitchedInDownlinkList.push_back (erab);
++    }
++    
++  EpcS1apHeader epcS1apHeader;
++  epcS1apHeader.SetProcedureCode (EpcS1apHeader::PathSwitchRequest);
++  epcS1apHeader.SetTypeOfMessage (EpcS1apHeader::InitiatingMessage);
++  
++  PathSwitchRequestHeader pathSwitchRequestHeader;
++  pathSwitchRequestHeader.SetMmeUeS1Id (mmeUeS1Id);
++  pathSwitchRequestHeader.SetEnbUeS1Id (enbUeS1Id);
++  pathSwitchRequestHeader.SetCgi (cgi);
++  pathSwitchRequestHeader.SetErabToBeSwitchedInDownlinkList (erabToBeSwitchedInDownlinkList);
++  
++  Ptr<Packet> packet = Create<Packet> ();
++  packet->AddHeader (pathSwitchRequestHeader);
++  packet->AddHeader (epcS1apHeader);
++  SendToS1apSocket (packet);
++}
++
++void 
++TapEpcEnbApplication::DoUeContextRelease (uint16_t rnti)
++{
++  NS_LOG_FUNCTION (this << rnti);
++  std::map<uint16_t, std::map<uint8_t, uint32_t> >::iterator rntiIt = m_rbidTeidMap.find (rnti);
++  if (rntiIt != m_rbidTeidMap.end ())
++    {
++      for (std::map<uint8_t, uint32_t>::iterator bidIt = rntiIt->second.begin ();
++           bidIt != rntiIt->second.end ();
++           ++bidIt)
++        {
++          uint32_t teid = bidIt->second;
++          m_teidRbidMap.erase (teid);
++        }
++      m_rbidTeidMap.erase (rntiIt);
++    }
++}
++
++void 
++TapEpcEnbApplication::DoInitialContextSetupRequest (uint64_t mmeUeS1Id, uint16_t enbUeS1Id, std::list<EpcS1apSapEnb::ErabToBeSetupItem> erabToBeSetupList)
++{
++  NS_LOG_FUNCTION (this);
++  
++  for (std::list<EpcS1apSapEnb::ErabToBeSetupItem>::iterator erabIt = erabToBeSetupList.begin ();
++       erabIt != erabToBeSetupList.end ();
++       ++erabIt)
++    {
++      // request the RRC to setup a radio bearer
++
++      uint64_t imsi = mmeUeS1Id;
++      std::map<uint64_t, uint16_t>::iterator imsiIt = m_imsiRntiMap.find (imsi);
++      NS_ASSERT_MSG (imsiIt != m_imsiRntiMap.end (), "unknown IMSI");
++      uint16_t rnti = imsiIt->second;
++      
++      struct EpcEnbS1SapUser::DataRadioBearerSetupRequestParameters params;
++      params.rnti = rnti;
++      params.bearer = erabIt->erabLevelQosParameters;
++      params.bearerId = erabIt->erabId;
++      params.gtpTeid = erabIt->sgwTeid;
++      m_s1SapUser->DataRadioBearerSetupRequest (params);
++
++      EpsFlowId_t rbid (rnti, erabIt->erabId);
++      // side effect: create entries if not exist
++      m_rbidTeidMap[rnti][erabIt->erabId] = params.gtpTeid;
++      m_teidRbidMap[params.gtpTeid] = rbid;
++
++      TeidDscpMapping::SetTeidDscpMapping (params.gtpTeid, params.bearer.qci);
++    }
++}
++
++void 
++TapEpcEnbApplication::DoPathSwitchRequestAcknowledge (uint64_t enbUeS1Id, uint64_t mmeUeS1Id, uint16_t cgi, std::list<EpcS1apSapEnb::ErabSwitchedInUplinkItem> erabToBeSwitchedInUplinkList)
++{
++  NS_LOG_FUNCTION (this);
++
++  uint64_t imsi = mmeUeS1Id;
++  std::map<uint64_t, uint16_t>::iterator imsiIt = m_imsiRntiMap.find (imsi);
++  NS_ASSERT_MSG (imsiIt != m_imsiRntiMap.end (), "unknown IMSI");
++  uint16_t rnti = imsiIt->second;
++  EpcEnbS1SapUser::PathSwitchRequestAcknowledgeParameters params;
++  params.rnti = rnti;
++  
++  m_s1SapUser->PathSwitchRequestAcknowledge (params);
++}
++
++void 
++TapEpcEnbApplication::RecvFromLteSocket (Ptr<Socket> socket)
++{
++  NS_LOG_FUNCTION (this);  
++  NS_ASSERT (socket == m_lteSocket);
++  Ptr<Packet> packet = socket->Recv ();
++
++  /// \internal
++  /// Workaround for \bugid{231}
++  SocketAddressTag satag;
++  packet->RemovePacketTag (satag);
++
++  EpsBearerTag tag;
++  bool found = packet->RemovePacketTag (tag);
++  NS_ASSERT (found);
++  uint16_t rnti = tag.GetRnti ();
++  uint8_t bid = tag.GetBid ();
++  NS_LOG_LOGIC ("received packet with RNTI=" << (uint32_t) rnti << ", BID=" << (uint32_t)  bid);
++  std::map<uint16_t, std::map<uint8_t, uint32_t> >::iterator rntiIt = m_rbidTeidMap.find (rnti);
++  if (rntiIt == m_rbidTeidMap.end ())
++    {
++      NS_LOG_WARN ("UE context not found, discarding packet");
++    }
++  else
++    {
++      std::map<uint8_t, uint32_t>::iterator bidIt = rntiIt->second.find (bid);
++      NS_ASSERT (bidIt != rntiIt->second.end ());
++      uint32_t teid = bidIt->second;
++      SendToS1uSocket (packet, teid);
++    }
++}
++
++void 
++TapEpcEnbApplication::RecvFromS1uSocket (Ptr<Socket> socket)
++{
++  NS_LOG_FUNCTION (this << socket);  
++  NS_ASSERT (socket == m_s1uSocket);
++  Ptr<Packet> packet = socket->Recv ();
++  GtpuHeader gtpu;
++  packet->RemoveHeader (gtpu);
++  uint32_t teid = gtpu.GetTeid ();
++  std::map<uint32_t, EpsFlowId_t>::iterator it = m_teidRbidMap.find (teid);
++  NS_ASSERT (it != m_teidRbidMap.end ());
++
++  /// \internal
++  /// Workaround for \bugid{231}
++  SocketAddressTag tag;
++  packet->RemovePacketTag (tag);
++  
++  SendToLteSocket (packet, it->second.m_rnti, it->second.m_bid);
++}
++
++void
++TapEpcEnbApplication::RecvFromS1apSocket (Ptr<Socket> socket)
++{
++  NS_LOG_FUNCTION (this);
++  NS_ASSERT (socket == m_s1apSocket);
++  Ptr<Packet> packet = socket->Recv ();
++  HandleS1apPacket (socket, packet);
++}
++
++void
++TapEpcEnbApplication::HandleS1apPacket (Ptr<Socket> socket, Ptr<Packet> packet)
++{
++  EpcS1apHeader epcS1apHeader;
++  packet->RemoveHeader (epcS1apHeader);
++  
++  uint8_t procedureCode = epcS1apHeader.GetProcedureCode ();
++  uint8_t typeOfMessage = epcS1apHeader.GetTypeOfMessage ();
++  
++  if (procedureCode == EpcS1apHeader::InitialContextSetup)
++    {
++      if (typeOfMessage == EpcS1apHeader::InitiatingMessage)
++        {
++          NS_LOG_LOGIC ("InitialContextSetup");
++          InitialContextSetupRequestHeader initialContextSetupRequestHeader;
++          packet->RemoveHeader (initialContextSetupRequestHeader);
++          
++          uint64_t mmeUeS1Id = initialContextSetupRequestHeader.GetMmeUeS1Id ();
++          uint16_t enbUeS1Id = initialContextSetupRequestHeader.GetEnbUeS1Id ();
++          std::list<EpcS1apSapEnb::ErabToBeSetupItem> erabToBeSetupList;
++          erabToBeSetupList = initialContextSetupRequestHeader.GetErabToBeSetupList ();
++          DoInitialContextSetupRequest (mmeUeS1Id, enbUeS1Id, erabToBeSetupList);
++        }
++    }
++  else if (procedureCode == EpcS1apHeader::PathSwitchRequest)
++    {
++      if (typeOfMessage == EpcS1apHeader::SuccessfulOutcome)
++        {
++          NS_LOG_LOGIC ("PathSwitchRequest");
++          PathSwitchRequestAcknowledgeHeader pathSwitchRequestAcknowledgeHeader;
++          packet->RemoveHeader (pathSwitchRequestAcknowledgeHeader);
++          
++          uint64_t mmeUeS1Id = pathSwitchRequestAcknowledgeHeader.GetMmeUeS1Id ();
++          uint16_t enbUeS1Id = pathSwitchRequestAcknowledgeHeader.GetEnbUeS1Id ();
++          uint16_t cgi = pathSwitchRequestAcknowledgeHeader.GetCgi ();
++          std::list<EpcS1apSapEnb::ErabSwitchedInUplinkItem> erabToBeSwitchedInUplinkList;
++          erabToBeSwitchedInUplinkList = pathSwitchRequestAcknowledgeHeader.GetErabToBeSwitchedInUplinkList ();
++          
++          DoPathSwitchRequestAcknowledge (enbUeS1Id, mmeUeS1Id, cgi, erabToBeSwitchedInUplinkList);
++        }
++    }
++    
++  if (packet->GetSize () != 0)
++    {
++      HandleS1apPacket (socket, packet);
++    }
++}
++
++void 
++TapEpcEnbApplication::SendToLteSocket (Ptr<Packet> packet, uint16_t rnti, uint8_t bid)
++{
++  NS_LOG_FUNCTION (this << packet << rnti << (uint16_t) bid << packet->GetSize ());  
++  EpsBearerTag tag (rnti, bid);
++  packet->AddPacketTag (tag);
++  int sentBytes = m_lteSocket->Send (packet);
++  NS_ASSERT (sentBytes > 0);
++}
++
++void 
++TapEpcEnbApplication::SendToS1uSocket (Ptr<Packet> packet, uint32_t teid)
++{
++  NS_LOG_FUNCTION (this << packet << teid <<  packet->GetSize ());  
++  GtpuHeader gtpu;
++  gtpu.SetTeid (teid);
++  // From 3GPP TS 29.281 v10.0.0 Section 5.1
++  // Length of the payload + the non obligatory GTP-U header
++  gtpu.SetLength (packet->GetSize () + gtpu.GetSerializedSize () - 8);  
++  packet->AddHeader (gtpu);
++  uint32_t flags = 0;
++  m_s1uSocket->SendTo (packet, flags, InetSocketAddress (m_sgwS1uAddress, m_gtpuUdpPort));
++}
++
++void
++TapEpcEnbApplication::SendToS1apSocket (Ptr<Packet> packet)
++{
++  NS_LOG_FUNCTION (this);
++  m_s1apSocket->Send (packet);
++}
++
++void
++TapEpcEnbApplication::DoReleaseIndication (uint64_t imsi, uint16_t rnti, uint8_t bearerId)
++{
++  NS_LOG_FUNCTION (this << bearerId );
++  std::list<EpcS1apSapMme::ErabToBeReleasedIndication> erabToBeReleaseIndication;
++  EpcS1apSapMme::ErabToBeReleasedIndication erab;
++  erab.erabId = bearerId;
++  erabToBeReleaseIndication.push_back (erab);
++  //From 3GPP TS 23401-950 Section 5.4.4.2, enB sends EPS bearer Identity in Bearer Release Indication message to MME
++
++  EpcS1apHeader epcS1apHeader;
++  epcS1apHeader.SetProcedureCode (EpcS1apHeader::ErabRelease);
++  epcS1apHeader.SetTypeOfMessage (EpcS1apHeader::InitiatingMessage);
++  
++  ErabReleaseIndicationHeader erabReleaseIndicationHeader;
++  erabReleaseIndicationHeader.SetMmeUeS1Id (imsi);
++  erabReleaseIndicationHeader.SetEnbUeS1Id (rnti);
++  erabReleaseIndicationHeader.SetErabToBeReleaseIndication (erabToBeReleaseIndication);
++  
++  Ptr<Packet> packet = Create<Packet> ();
++  packet->AddHeader (erabReleaseIndicationHeader);
++  packet->AddHeader (epcS1apHeader);
++  SendToS1apSocket (packet);
++}
++
++}  // namespace ns3
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/model/tap-epc-enb-application.h ns-3.22/src/lte/model/tap-epc-enb-application.h
+--- ns-3.22-backup/src/lte/model/tap-epc-enb-application.h	1970-01-01 08:00:00.000000000 +0800
++++ ns-3.22/src/lte/model/tap-epc-enb-application.h	2016-09-22 23:09:33.201596647 +0800
+@@ -0,0 +1,249 @@
++/* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
++/*
++ * Copyright (c) 2011 Centre Tecnologic de Telecomunicacions de Catalunya (CTTC)
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation;
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ * Author: Jaume Nin <jnin@cttc.cat>
++ *         Nicola Baldo <nbaldo@cttc.cat>
++ */
++
++#ifndef TAP_EPC_ENB_APPLICATION_H
++#define TAP_EPC_ENB_APPLICATION_H
++
++#include <ns3/address.h>
++#include <ns3/socket.h>
++#include <ns3/virtual-net-device.h>
++#include <ns3/traced-callback.h>
++#include <ns3/callback.h>
++#include <ns3/ptr.h>
++#include <ns3/object.h>
++#include <ns3/lte-common.h>
++#include <ns3/application.h>
++#include <ns3/eps-bearer.h>
++#include <ns3/epc-enb-s1-sap.h>
++#include <ns3/epc-s1ap-header.h>
++#include <ns3/epc-s1ap-sap.h>
++#include <map>
++
++namespace ns3 {
++
++class EpcEnbS1SapUser;
++class EpcEnbS1SapProvider;
++
++/**
++ * \ingroup lte
++ *
++ * This application is installed inside eNBs and provides the bridge functionality for user data plane packets between the radio interface and the S1-U interface.
++ */
++class TapEpcEnbApplication : public Application
++{
++
++  friend class MemberEpcEnbS1SapProvider<TapEpcEnbApplication>;
++  friend class MemberEpcS1apSapEnb<TapEpcEnbApplication>;
++
++  // inherited from Object
++public:
++  static TypeId GetTypeId (void);
++  
++protected:
++  void DoDispose (void);
++
++public:
++
++  /** 
++   * Constructor
++   * 
++   * \param lteSocket the socket to be used to send/receive packets to/from the LTE radio interface
++   * \param s1uSocket the socket to be used to send/receive packets
++   * to/from the S1-U interface connected with the SGW 
++   * \param enbS1uAddress the IPv4 address of the S1-U interface of this eNB
++   * \param sgwS1uAddress the IPv4 address at which this eNB will be able to reach its SGW for S1-U communications
++   * \param cellId the identifier of the enb
++   */
++  TapEpcEnbApplication (Ptr<Socket> lteSocket, Ptr<Socket> s1uSocket,
++                        Ptr<Socket> s1apSocket, Ipv4Address enbS1uAddress,
++                        Ipv4Address sgwS1uAddress, uint16_t cellId);
++
++  /**
++   * Destructor
++   */
++  virtual ~TapEpcEnbApplication (void);
++
++  /** 
++   * Set the S1 SAP User
++   * 
++   * \param s the S1 SAP User
++   */
++  void SetS1SapUser (EpcEnbS1SapUser * s);
++
++  /** 
++   * \return the S1 SAP Provider
++   */
++  EpcEnbS1SapProvider* GetS1SapProvider ();
++
++  /** 
++   * \return the ENB side of the S1-AP SAP 
++   */
++  EpcS1apSapEnb* GetS1apSapEnb ();
++ 
++  /** 
++   * Method to be assigned to the recv callback of the LTE socket. It is called when the eNB receives a data packet from the radio interface that is to be forwarded to the SGW.
++   * 
++   * \param socket pointer to the LTE socket
++   */
++  void RecvFromLteSocket (Ptr<Socket> socket);
++
++  /** 
++   * Method to be assigned to the recv callback of the S1-U socket. It is called when the eNB receives a data packet from the SGW that is to be forwarded to the UE.
++   * 
++   * \param socket pointer to the S1-U socket
++   */
++  void RecvFromS1uSocket (Ptr<Socket> socket);
++  
++  void RecvFromS1apSocket (Ptr<Socket> socket);
++
++  struct EpsFlowId_t
++  {
++    uint16_t  m_rnti;
++    uint8_t   m_bid;
++
++  public:
++    EpsFlowId_t ();
++    EpsFlowId_t (const uint16_t a, const uint8_t b);
++
++    friend bool operator == (const EpsFlowId_t &a, const EpsFlowId_t &b);
++    friend bool operator < (const EpsFlowId_t &a, const EpsFlowId_t &b);
++  };
++
++private:
++
++  // ENB S1 SAP provider methods
++  void DoInitialUeMessage (uint64_t imsi, uint16_t rnti);
++  void DoPathSwitchRequest (EpcEnbS1SapProvider::PathSwitchRequestParameters params);
++  void DoUeContextRelease (uint16_t rnti);
++  
++  // S1-AP SAP ENB methods
++  void DoInitialContextSetupRequest (uint64_t mmeUeS1Id, uint16_t enbUeS1Id,
++                                     std::list<EpcS1apSapEnb::ErabToBeSetupItem> erabToBeSetupList);
++  void DoPathSwitchRequestAcknowledge (uint64_t enbUeS1Id, uint64_t mmeUeS1Id, uint16_t cgi,
++                                       std::list<EpcS1apSapEnb::ErabSwitchedInUplinkItem> erabToBeSwitchedInUplinkList);
++                                      
++  void HandleS1apPacket (Ptr<Socket> socket, Ptr<Packet> packet);
++
++  /** 
++   * \brief This function accepts bearer id corresponding to a particular UE and schedules indication of bearer release towards MME
++   * \param imsi maps to mmeUeS1Id
++   * \param rnti maps to enbUeS1Id
++   * \param bearerId Bearer Identity which is to be de-activated
++   */
++  void DoReleaseIndication (uint64_t imsi, uint16_t rnti, uint8_t bearerId);
++
++  /**
++   * Send a packet to the UE via the LTE radio interface of the eNB
++   * 
++   * \param packet t
++   * \param bid the EPS Bearer IDentifier
++   */
++  void SendToLteSocket (Ptr<Packet> packet, uint16_t rnti, uint8_t bid);
++
++  /** 
++   * Send a packet to the SGW via the S1-U interface
++   * 
++   * \param packet packet to be sent
++   * \param teid the Tunnel Enpoint IDentifier
++   */
++  void SendToS1uSocket (Ptr<Packet> packet, uint32_t teid);
++  
++  void SendToS1apSocket (Ptr<Packet> packet);
++
++  /** 
++   * internal method used for the actual setup of the S1 Bearer
++   * 
++   * \param teid 
++   * \param rnti 
++   * \param bid 
++   */
++  void SetupS1Bearer (uint32_t teid, uint16_t rnti, uint8_t bid);
++
++  /**
++   * raw packet socket to send and receive the packets to and from the LTE radio interface
++   */
++  Ptr<Socket> m_lteSocket;
++
++  /**
++   * UDP socket to send and receive GTP-U the packets to and from the S1-U interface
++   */
++  Ptr<Socket> m_s1uSocket;
++  
++  Ptr<Socket> m_s1apSocket;
++
++  /**
++   * address of the eNB for S1-U communications
++   */
++  Ipv4Address m_enbS1uAddress;
++
++  /**
++   * address of the SGW which terminates all S1-U tunnels
++   */
++  Ipv4Address m_sgwS1uAddress;
++
++  /**
++   * map of maps telling for each RNTI and BID the corresponding  S1-U TEID
++   * 
++   */
++  std::map<uint16_t, std::map<uint8_t, uint32_t> > m_rbidTeidMap;  
++
++  /**
++   * map telling for each S1-U TEID the corresponding RNTI,BID
++   * 
++   */
++  std::map<uint32_t, EpsFlowId_t> m_teidRbidMap;
++ 
++  /**
++   * UDP port to be used for GTP
++   */
++  uint16_t m_gtpuUdpPort;
++  
++  uint16_t m_s1apTcpPort;
++
++  /**
++   * Provider for the S1 SAP 
++   */
++  EpcEnbS1SapProvider* m_s1SapProvider;
++
++  /**
++   * User for the S1 SAP 
++   */
++  EpcEnbS1SapUser* m_s1SapUser;
++
++  /**
++   * ENB side of the S1-AP SAP
++   * 
++   */
++  EpcS1apSapEnb* m_s1apSapEnb;
++
++  /**
++   * UE context info
++   * 
++   */
++  std::map<uint64_t, uint16_t> m_imsiRntiMap;
++
++  uint16_t m_cellId;
++};
++
++} //namespace ns3
++
++#endif /* TAP_EPC_ENB_APPLICATION_H */
++
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/model/tap-epc-mme.cc ns-3.22/src/lte/model/tap-epc-mme.cc
+--- ns-3.22-backup/src/lte/model/tap-epc-mme.cc	1970-01-01 08:00:00.000000000 +0800
++++ ns-3.22/src/lte/model/tap-epc-mme.cc	2016-09-22 23:09:33.201596647 +0800
+@@ -0,0 +1,337 @@
++/* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
++/*
++ * Copyright (c) 2011 Centre Tecnologic de Telecomunicacions de Catalunya (CTTC)
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation;
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ * Author: Nicola Baldo <nbaldo@cttc.es>
++ */
++
++#include <ns3/tap-epc-mme.h>
++
++#include <ns3/fatal-error.h>
++#include <ns3/log.h>
++#include <ns3/packet.h>
++#include <ns3/core-module.h>
++
++#include <ns3/epc-s1ap-sap.h>
++#include <ns3/epc-s1ap-header.h>
++#include <ns3/epc-s11-sap.h>
++
++namespace ns3 {
++
++NS_LOG_COMPONENT_DEFINE ("TapEpcMme");
++
++NS_OBJECT_ENSURE_REGISTERED (TapEpcMme);
++
++TapEpcMme::TapEpcMme ()
++  : m_s11SapSgw (0)
++{
++  NS_LOG_FUNCTION (this);
++  m_s11SapMme = new MemberEpcS11SapMme<TapEpcMme> (this);
++}
++
++TapEpcMme::~TapEpcMme ()
++{
++  NS_LOG_FUNCTION (this);
++}
++
++void
++TapEpcMme::DoDispose ()
++{
++  NS_LOG_FUNCTION (this);
++  delete m_s11SapMme;
++}
++
++TypeId
++TapEpcMme::GetTypeId (void)
++{
++  static TypeId tid = TypeId ("ns3::TapEpcMme")
++    .SetParent<Object> ()
++    .AddConstructor<TapEpcMme> ()
++    ;
++  return tid;
++}
++
++void 
++TapEpcMme::SetS11SapSgw (EpcS11SapSgw * s)
++{
++  m_s11SapSgw = s;
++}
++
++EpcS11SapMme* 
++TapEpcMme::GetS11SapMme ()
++{
++  return m_s11SapMme;
++}
++
++void
++TapEpcMme::AddS1apSocket (Address addr, Ptr<Socket> socket)
++{
++  InetSocketAddress inetAddr = InetSocketAddress::ConvertFrom (addr);
++  Ipv4Address enbS1apAddr = inetAddr.GetIpv4 ();
++  NS_LOG_FUNCTION (this << addr << socket << enbS1apAddr);
++  m_s1apSocketMap[enbS1apAddr.Get ()] = socket;
++}
++
++void
++TapEpcMme::SendToS1apSocket (Ptr<Socket> socket, Ptr<Packet> packet)
++{
++  socket->Send (packet);
++}
++
++void 
++TapEpcMme::AddEnb (uint16_t cgi, Ipv4Address enbS1uAddr, Ipv4Address enbS1apAddr)
++{
++  NS_LOG_FUNCTION (this << cgi << enbS1uAddr);
++  Ptr<EnbInfo> enbInfo = Create<EnbInfo> ();
++  enbInfo->cgi = cgi;
++  enbInfo->s1uAddr = enbS1uAddr;
++  enbInfo->s1apAddr = enbS1apAddr;
++  m_enbInfoMap[cgi] = enbInfo;
++}
++
++void 
++TapEpcMme::AddUe (uint64_t imsi)
++{
++  NS_LOG_FUNCTION (this << imsi);
++  Ptr<UeInfo> ueInfo = Create<UeInfo> ();
++  ueInfo->imsi = imsi;
++  ueInfo->mmeUeS1Id = imsi;
++  m_ueInfoMap[imsi] = ueInfo;
++  ueInfo->bearerCounter = 0;
++}
++
++uint8_t
++TapEpcMme::AddBearer (uint64_t imsi, Ptr<EpcTft> tft, EpsBearer bearer)
++{
++  NS_LOG_FUNCTION (this << imsi);
++  std::map<uint64_t, Ptr<UeInfo> >::iterator it = m_ueInfoMap.find (imsi);
++  NS_ASSERT_MSG (it != m_ueInfoMap.end (), "could not find any UE with IMSI " << imsi);
++  NS_ASSERT_MSG (it->second->bearerCounter < 11, "too many bearers already! " << it->second->bearerCounter);
++  BearerInfo bearerInfo;
++  bearerInfo.bearerId = ++(it->second->bearerCounter);
++  bearerInfo.tft = tft;
++  bearerInfo.bearer = bearer;  
++  it->second->bearersToBeActivated.push_back (bearerInfo);
++  return bearerInfo.bearerId;
++}
++
++// S1-AP SAP MME forwarded methods
++void 
++TapEpcMme::DoInitialUeMessage (uint64_t mmeUeS1Id, uint16_t enbUeS1Id, uint64_t imsi, uint16_t cgi)
++{
++  // mmeUeS1Id = imsi, enbUeS1Id = rnti, imsi = imsi, cgi = m_cellId
++  NS_LOG_FUNCTION (this << mmeUeS1Id << enbUeS1Id << imsi << cgi);
++  std::map<uint64_t, Ptr<UeInfo> >::iterator it = m_ueInfoMap.find (imsi);
++  NS_ASSERT_MSG (it != m_ueInfoMap.end (), "could not find any UE with IMSI " << imsi);
++  it->second->cellId = cgi;
++  EpcS11SapSgw::CreateSessionRequestMessage msg;
++  msg.imsi = imsi;
++  msg.uli.cgi = cgi;
++  for (std::list<BearerInfo>::iterator bit = it->second->bearersToBeActivated.begin ();
++       bit != it->second->bearersToBeActivated.end ();
++       ++bit)
++    {
++      EpcS11SapSgw::BearerContextToBeCreated bearerContext;
++      bearerContext.epsBearerId = bit->bearerId;
++      bearerContext.bearerLevelQos = bit->bearer; 
++      bearerContext.tft = bit->tft;
++      msg.bearerContextsToBeCreated.push_back (bearerContext);
++    }
++  m_s11SapSgw->CreateSessionRequest (msg);
++}
++
++void 
++TapEpcMme::DoInitialContextSetupResponse (uint64_t mmeUeS1Id, uint16_t enbUeS1Id, std::list<EpcS1apSapMme::ErabSetupItem> erabSetupList)
++{
++  NS_LOG_FUNCTION (this << mmeUeS1Id << enbUeS1Id);
++  NS_FATAL_ERROR ("unimplemented");
++}
++
++void
++TapEpcMme::DoPathSwitchRequest (uint64_t enbUeS1Id, uint64_t mmeUeS1Id, uint16_t cgi, std::list<EpcS1apSapMme::ErabSwitchedInDownlinkItem> erabToBeSwitchedInDownlinkList)
++{
++  NS_LOG_FUNCTION (this << mmeUeS1Id << enbUeS1Id << cgi);
++
++  uint64_t imsi = mmeUeS1Id;
++  std::map<uint64_t, Ptr<UeInfo> >::iterator it = m_ueInfoMap.find (imsi);
++  NS_ASSERT_MSG (it != m_ueInfoMap.end (), "could not find any UE with IMSI " << imsi);
++  NS_LOG_INFO ("IMSI " << imsi << " old eNB: " << it->second->cellId << ", new eNB: " << cgi);
++  it->second->cellId = cgi;
++  it->second->enbUeS1Id = enbUeS1Id;
++
++  EpcS11SapSgw::ModifyBearerRequestMessage msg;
++  msg.teid = imsi; // trick to avoid the need for allocating TEIDs on the S11 interface
++  msg.uli.cgi = cgi;
++  // bearer modification is not supported for now
++  m_s11SapSgw->ModifyBearerRequest (msg);
++}
++
++// S11 SAP MME forwarded methods
++void
++TapEpcMme::DoCreateSessionResponse (EpcS11SapMme::CreateSessionResponseMessage msg)
++{
++  NS_LOG_FUNCTION (this << msg.teid);
++  uint64_t imsi = msg.teid;
++  std::list<EpcS1apSapEnb::ErabToBeSetupItem> erabToBeSetupList;
++  for (std::list<EpcS11SapMme::BearerContextCreated>::iterator bit = msg.bearerContextsCreated.begin ();
++       bit != msg.bearerContextsCreated.end ();
++       ++bit)
++    {
++      EpcS1apSapEnb::ErabToBeSetupItem erab;
++      erab.erabId = bit->epsBearerId;
++      erab.erabLevelQosParameters = bit->bearerLevelQos;
++      erab.transportLayerAddress = bit->sgwFteid.address;
++      erab.sgwTeid = bit->sgwFteid.teid;      
++      erabToBeSetupList.push_back (erab);
++    }
++  std::map<uint64_t, Ptr<UeInfo> >::iterator it = m_ueInfoMap.find (imsi);
++  NS_ASSERT_MSG (it != m_ueInfoMap.end (), "could not find any UE with IMSI " << imsi);
++  uint16_t cellId = it->second->cellId;
++  uint16_t enbUeS1Id = it->second->enbUeS1Id;
++  uint64_t mmeUeS1Id = it->second->mmeUeS1Id;
++  std::map<uint16_t, Ptr<EnbInfo> >::iterator jt = m_enbInfoMap.find (cellId);
++  NS_ASSERT_MSG (jt != m_enbInfoMap.end (), "could not find any eNB with CellId " << cellId);
++
++  Ipv4Address enbS1apAddr = jt->second->s1apAddr;
++  Ptr<Socket> s1apSocket = m_s1apSocketMap[enbS1apAddr.Get ()];
++  
++  EpcS1apHeader epcS1apHeader;
++  epcS1apHeader.SetProcedureCode (EpcS1apHeader::InitialContextSetup);
++  epcS1apHeader.SetTypeOfMessage (EpcS1apHeader::InitiatingMessage);
++  
++  InitialContextSetupRequestHeader initialContextSetupRequestHeader;
++  initialContextSetupRequestHeader.SetMmeUeS1Id (mmeUeS1Id);
++  initialContextSetupRequestHeader.SetEnbUeS1Id (enbUeS1Id);
++  initialContextSetupRequestHeader.SetErabToBeSetupList (erabToBeSetupList);
++
++  Ptr<Packet> packet = Create<Packet> ();
++  packet->AddHeader (initialContextSetupRequestHeader);
++  packet->AddHeader (epcS1apHeader);
++  SendToS1apSocket (s1apSocket, packet);
++}
++
++void
++TapEpcMme::DoModifyBearerResponse (EpcS11SapMme::ModifyBearerResponseMessage msg)
++{
++  NS_LOG_FUNCTION (this << msg.teid);
++  NS_ASSERT (msg.cause == EpcS11SapMme::ModifyBearerResponseMessage::REQUEST_ACCEPTED);
++  uint64_t imsi = msg.teid;
++  std::map<uint64_t, Ptr<UeInfo> >::iterator it = m_ueInfoMap.find (imsi);
++  NS_ASSERT_MSG (it != m_ueInfoMap.end (), "could not find any UE with IMSI " << imsi);
++  uint64_t enbUeS1Id = it->second->enbUeS1Id;
++  uint64_t mmeUeS1Id = it->second->mmeUeS1Id;
++  uint16_t cgi = it->second->cellId;
++  std::list<EpcS1apSapEnb::ErabSwitchedInUplinkItem> erabToBeSwitchedInUplinkList; // unused for now
++  std::map< uint16_t, Ptr<EnbInfo> >::iterator jt = m_enbInfoMap.find (it->second->cellId);
++  NS_ASSERT_MSG (jt != m_enbInfoMap.end (), "could not find any eNB with CellId " << it->second->cellId);
++
++  Ipv4Address enbS1apAddr = jt->second->s1apAddr;
++  Ptr<Socket> s1apSocket = m_s1apSocketMap[enbS1apAddr.Get ()];
++  
++  EpcS1apHeader epcS1apHeader;
++  epcS1apHeader.SetProcedureCode (EpcS1apHeader::PathSwitchRequest);
++  epcS1apHeader.SetTypeOfMessage (EpcS1apHeader::SuccessfulOutcome);
++  
++  PathSwitchRequestAcknowledgeHeader pathSwitchRequestAcknowledgeHeader;
++  pathSwitchRequestAcknowledgeHeader.SetMmeUeS1Id (mmeUeS1Id);
++  pathSwitchRequestAcknowledgeHeader.SetEnbUeS1Id (enbUeS1Id);
++  pathSwitchRequestAcknowledgeHeader.SetCgi (cgi);
++  pathSwitchRequestAcknowledgeHeader.SetErabToBeSwitchedInUplinkList (erabToBeSwitchedInUplinkList);
++
++  Ptr<Packet> packet = Create<Packet> ();
++  packet->AddHeader (pathSwitchRequestAcknowledgeHeader);
++  packet->AddHeader (epcS1apHeader);
++  SendToS1apSocket (s1apSocket, packet);
++}
++
++void
++TapEpcMme::DoErabReleaseIndication (uint64_t mmeUeS1Id, uint16_t enbUeS1Id, std::list<EpcS1apSapMme::ErabToBeReleasedIndication> erabToBeReleaseIndication)
++{
++  NS_LOG_FUNCTION (this << mmeUeS1Id << enbUeS1Id);
++  uint64_t imsi = mmeUeS1Id;
++  std::map<uint64_t, Ptr<UeInfo> >::iterator it = m_ueInfoMap.find (imsi);
++  NS_ASSERT_MSG (it != m_ueInfoMap.end (), "could not find any UE with IMSI " << imsi);
++
++  EpcS11SapSgw::DeleteBearerCommandMessage msg;
++  // trick to avoid the need for allocating TEIDs on the S11 interface
++  msg.teid = imsi;
++
++  for (std::list<EpcS1apSapMme::ErabToBeReleasedIndication>::iterator bit = erabToBeReleaseIndication.begin (); bit != erabToBeReleaseIndication.end (); ++bit)
++    {
++      EpcS11SapSgw::BearerContextToBeRemoved bearerContext;
++      bearerContext.epsBearerId =  bit->erabId;
++      msg.bearerContextsToBeRemoved.push_back (bearerContext);
++    }
++  //Delete Bearer command towards epc-sgw-pgw-application
++  m_s11SapSgw->DeleteBearerCommand (msg);
++}
++
++void
++TapEpcMme::DoDeleteBearerRequest (EpcS11SapMme::DeleteBearerRequestMessage msg)
++{
++  NS_LOG_FUNCTION (this);
++  uint64_t imsi = msg.teid;
++  std::map<uint64_t, Ptr<UeInfo> >::iterator it = m_ueInfoMap.find (imsi);
++  NS_ASSERT_MSG (it != m_ueInfoMap.end (), "could not find any UE with IMSI " << imsi);
++  EpcS11SapSgw::DeleteBearerResponseMessage res;
++
++  res.teid = imsi;
++
++  for (std::list<EpcS11SapMme::BearerContextRemoved>::iterator bit = msg.bearerContextsRemoved.begin ();
++       bit != msg.bearerContextsRemoved.end ();
++       ++bit)
++    {
++      EpcS11SapSgw::BearerContextRemovedSgwPgw bearerContext;
++      bearerContext.epsBearerId = bit->epsBearerId;
++      res.bearerContextsRemoved.push_back (bearerContext);
++
++      RemoveBearer (it->second, bearerContext.epsBearerId); //schedules function to erase, context of de-activated bearer
++    }
++  //schedules Delete Bearer Response towards epc-sgw-pgw-application
++  m_s11SapSgw->DeleteBearerResponse (res);
++}
++
++void TapEpcMme::RemoveBearer (Ptr<UeInfo> ueInfo, uint8_t epsBearerId)
++{
++  NS_LOG_FUNCTION (this << epsBearerId);
++  for (std::list<BearerInfo>::iterator bit = ueInfo->bearersToBeActivated.begin ();
++       bit != ueInfo->bearersToBeActivated.end ();
++       ++bit)
++    {
++      if (bit->bearerId == epsBearerId)
++        {
++          ueInfo->bearersToBeActivated.erase (bit);
++          break;
++        }
++    }
++}
++
++void TapEpcMme::PathSwitchRequest (uint64_t enbUeS1Id, uint64_t mmeUeS1Id, uint16_t cgi, std::list<EpcS1apSapMme::ErabSwitchedInDownlinkItem> erabToBeSwitchedInDownlinkList)
++{
++  DoPathSwitchRequest (enbUeS1Id, mmeUeS1Id, cgi, erabToBeSwitchedInDownlinkList);
++}
++
++void TapEpcMme::ErabReleaseIndication (uint64_t mmeUeS1Id, uint16_t enbUeS1Id, std::list<EpcS1apSapMme::ErabToBeReleasedIndication> erabToBeReleaseIndication)
++{
++  return DoErabReleaseIndication (mmeUeS1Id, enbUeS1Id, erabToBeReleaseIndication);
++}
++
++void TapEpcMme::InitialUeMessage (uint64_t mmeUeS1Id, uint16_t enbUeS1Id, uint64_t imsi, uint16_t ecgi)
++{
++  DoInitialUeMessage (mmeUeS1Id, enbUeS1Id, imsi, ecgi);
++}
++
++} // namespace ns3
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/model/tap-epc-mme.h ns-3.22/src/lte/model/tap-epc-mme.h
+--- ns-3.22-backup/src/lte/model/tap-epc-mme.h	1970-01-01 08:00:00.000000000 +0800
++++ ns-3.22/src/lte/model/tap-epc-mme.h	2016-09-22 23:09:33.201596647 +0800
+@@ -0,0 +1,184 @@
++/* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
++/*
++ * Copyright (c) 2012 Centre Tecnologic de Telecomunicacions de Catalunya (CTTC)
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation;
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ * Author: Nicola Baldo <nbaldo@cttc.es>
++ */
++
++#ifndef TAP_EPC_MME_H
++#define TAP_EPC_MME_H
++
++#include <ns3/object.h>
++#include <ns3/socket.h>
++#include <ns3/epc-s1ap-header.h>
++#include <ns3/epc-s11-sap.h>
++
++#include <map>
++#include <list>
++
++namespace ns3 {
++
++class Node;
++class NetDevice;
++
++/**
++ * \brief This class implements the MME functionality.
++ */
++class TapEpcMme : public Object
++{
++
++  friend class MemberEpcS11SapMme<TapEpcMme>;
++  
++public:
++  /** 
++   * Constructor
++   */
++  TapEpcMme ();
++
++  /** 
++   * Destructor
++   */  
++  virtual ~TapEpcMme ();
++  
++  // inherited from Object  
++  static TypeId GetTypeId (void);
++
++  /** 
++   * \return the MME side of the S1-AP SAP 
++   */
++  EpcS1apSapMme* GetS1apSapMme ();
++
++  /** 
++   * Set the SGW side of the S11 SAP 
++   * 
++   * \param s the SGW side of the S11 SAP 
++   */
++  void SetS11SapSgw (EpcS11SapSgw *s);
++
++  /** 
++   * \return the MME side of the S11 SAP 
++   */
++  EpcS11SapMme* GetS11SapMme ();
++  
++  void AddS1apSocket (Address addr, Ptr<Socket> socket);
++  
++  /** 
++   * Add a new ENB to the MME. 
++   * \param ecgi E-UTRAN Cell Global ID, the unique identifier of the eNodeB
++   * \param enbS1apSap the ENB side of the S1-AP SAP 
++   */
++  void AddEnb (uint16_t ecgi, Ipv4Address enbS1uAddr, Ipv4Address enbS1apAddr);
++  
++  /** 
++   * Add a new UE to the MME. This is the equivalent of storing the UE
++   * credentials before the UE is ever turned on. 
++   * 
++   * \param imsi the unique identifier of the UE
++   */
++  void AddUe (uint64_t imsi);
++
++  /** 
++   * Add an EPS bearer to the list of bearers to be activated for this
++   * UE. The bearer will be activated when the UE enters the ECM
++   * connected state.
++   * 
++   * \param imsi UE identifier
++   * \param tft traffic flow template of the bearer
++   * \param bearer QoS characteristics of the bearer
++   */
++  uint8_t AddBearer (uint64_t imsi, Ptr<EpcTft> tft, EpsBearer bearer);
++  
++  void PathSwitchRequest (uint64_t enbUeS1Id, uint64_t mmeUeS1Id, uint16_t cgi, std::list<EpcS1apSapMme::ErabSwitchedInDownlinkItem> erabToBeSwitchedInDownlinkList);
++  void ErabReleaseIndication (uint64_t mmeUeS1Id, uint16_t enbUeS1Id, std::list<EpcS1apSapMme::ErabToBeReleasedIndication> erabToBeReleaseIndication);
++  void InitialUeMessage (uint64_t mmeUeS1Id, uint16_t enbUeS1Id, uint64_t imsi, uint16_t ecgi);
++
++protected:  
++  virtual void DoDispose ();
++
++private:
++
++  // S1-AP SAP MME forwarded methods
++  void DoInitialUeMessage (uint64_t mmeUeS1Id, uint16_t enbUeS1Id, uint64_t imsi, uint16_t ecgi);
++  void DoInitialContextSetupResponse (uint64_t mmeUeS1Id, uint16_t enbUeS1Id, std::list<EpcS1apSapMme::ErabSetupItem> erabSetupList);
++  void DoPathSwitchRequest (uint64_t enbUeS1Id, uint64_t mmeUeS1Id, uint16_t cgi, std::list<EpcS1apSapMme::ErabSwitchedInDownlinkItem> erabToBeSwitchedInDownlinkList);
++  void DoErabReleaseIndication (uint64_t mmeUeS1Id, uint16_t enbUeS1Id, std::list<EpcS1apSapMme::ErabToBeReleasedIndication> erabToBeReleaseIndication);
++
++  // S11 SAP MME forwarded methods
++  void DoCreateSessionResponse (EpcS11SapMme::CreateSessionResponseMessage msg);
++  void DoModifyBearerResponse (EpcS11SapMme::ModifyBearerResponseMessage msg);
++  void DoDeleteBearerRequest (EpcS11SapMme::DeleteBearerRequestMessage msg);
++
++  void SendToS1apSocket (Ptr<Socket> socket, Ptr<Packet> packet);
++
++  /**
++   * Hold info on an EPS bearer to be activated
++   */
++  struct BearerInfo
++  {
++    Ptr<EpcTft> tft;
++    EpsBearer bearer;
++    uint8_t bearerId;
++  };
++  
++  /**
++   * Hold info on a UE
++   */
++  struct UeInfo : public SimpleRefCount<UeInfo>
++  {
++    uint64_t mmeUeS1Id;
++    uint16_t enbUeS1Id;
++    uint64_t imsi;
++    uint16_t cellId;
++    std::list<BearerInfo> bearersToBeActivated;
++    uint16_t bearerCounter;
++  };
++
++  /**
++   * UeInfo stored by IMSI
++   */  
++  std::map<uint64_t, Ptr<UeInfo> > m_ueInfoMap;
++
++  /**
++   * \brief This Function erases all contexts of bearer from MME side
++   * \param ueInfo UE information pointer
++   * \param epsBearerId Bearer Id which need to be removed corresponding to UE
++   */
++  void RemoveBearer (Ptr<UeInfo> ueInfo, uint8_t epsBearerId);
++
++  /**
++   * Hold info on a ENB
++   */
++  struct EnbInfo : public SimpleRefCount<EnbInfo>
++  {
++    uint16_t cgi;
++    Ipv4Address s1uAddr;
++    Ipv4Address s1apAddr;
++  };
++
++  /**
++   * EnbInfo stored by EGCI
++   */
++  std::map< uint16_t, Ptr<EnbInfo> > m_enbInfoMap;
++  
++  std::map< uint32_t, Ptr<Socket> > m_s1apSocketMap;
++
++  EpcS11SapMme *m_s11SapMme;
++  EpcS11SapSgw *m_s11SapSgw;
++};
++
++} // namespace ns3
++
++#endif // TAP_EPC_MME_H
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/model/teid-dscp-mapping.cc ns-3.22/src/lte/model/teid-dscp-mapping.cc
+--- ns-3.22-backup/src/lte/model/teid-dscp-mapping.cc	1970-01-01 08:00:00.000000000 +0800
++++ ns-3.22/src/lte/model/teid-dscp-mapping.cc	2016-09-22 23:09:33.201596647 +0800
+@@ -0,0 +1,98 @@
++#include "ns3/teid-dscp-mapping.h"
++#include "ns3/singleton.h"
++#include "ns3/core-module.h"
++#include "ns3/log.h"
++#include "ns3/eps-bearer.h"
++#include "ns3/ipv4-header.h"
++#include <map>
++
++namespace ns3 {
++
++NS_LOG_COMPONENT_DEFINE ("TeidDscpMapping");
++
++class TeidDscpMappingImpl
++{
++public:
++
++  TeidDscpMappingImpl (void);
++  void SetTeidDscpMapping (uint32_t teid, Ipv4Header::DscpType dscp);
++  void SetTeidDscpMapping (uint32_t teid, EpsBearer::Qci qci);
++  Ipv4Header::DscpType GetTeidDscpMapping (uint32_t teid);
++
++private:
++
++  std::map<uint32_t, Ipv4Header::DscpType> m_teidDscpMap;
++};
++
++TeidDscpMappingImpl::TeidDscpMappingImpl (void)
++{
++}
++
++void
++TeidDscpMappingImpl::SetTeidDscpMapping (uint32_t teid, Ipv4Header::DscpType dscp)
++{
++  m_teidDscpMap[teid] = dscp;
++}
++
++void
++TeidDscpMappingImpl::SetTeidDscpMapping (uint32_t teid, EpsBearer::Qci qci)
++{
++  Ipv4Header::DscpType dscp;
++  switch (qci)
++    {
++      case EpsBearer::GBR_CONV_VOICE:
++      case EpsBearer::GBR_CONV_VIDEO:
++      case EpsBearer::GBR_GAMING:
++           dscp = Ipv4Header::DSCP_EF;
++           break;
++      case EpsBearer::GBR_NON_CONV_VIDEO:
++           dscp = Ipv4Header::DSCP_AF41;
++           break;
++      case EpsBearer::NGBR_IMS:
++      case EpsBearer::NGBR_VIDEO_TCP_OPERATOR:
++           dscp = Ipv4Header::DSCP_AF31;
++           break;
++      case EpsBearer::NGBR_VOICE_VIDEO_GAMING:
++           dscp = Ipv4Header::DSCP_AF21;
++           break;
++      case EpsBearer::NGBR_VIDEO_TCP_PREMIUM:
++           dscp = Ipv4Header::DSCP_AF11;
++           break;
++      case EpsBearer::NGBR_VIDEO_TCP_DEFAULT:
++      default:
++           dscp = Ipv4Header::DscpDefault;
++           break;
++    }
++  m_teidDscpMap[teid] = dscp;
++  NS_LOG_LOGIC ("TeidDscpMappingImpl::SetTeidDscpMapping TEID: " << teid << " DSCP: " << dscp);
++}
++
++Ipv4Header::DscpType
++TeidDscpMappingImpl::GetTeidDscpMapping (uint32_t teid)
++{
++  return m_teidDscpMap[teid];
++}
++
++namespace TeidDscpMapping {
++
++void
++SetTeidDscpMapping (uint32_t teid, Ipv4Header::DscpType dscp)
++{
++  Singleton<TeidDscpMappingImpl>::Get ()->SetTeidDscpMapping (teid, dscp);
++}
++
++void
++SetTeidDscpMapping (uint32_t teid, EpsBearer::Qci qci)
++{
++  Singleton<TeidDscpMappingImpl>::Get ()->SetTeidDscpMapping (teid, qci);
++}
++
++Ipv4Header::DscpType
++GetTeidDscpMapping (uint32_t teid)
++{
++  return Singleton<TeidDscpMappingImpl>::Get ()->GetTeidDscpMapping (teid);
++}
++
++}
++
++}
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/model/teid-dscp-mapping.h ns-3.22/src/lte/model/teid-dscp-mapping.h
+--- ns-3.22-backup/src/lte/model/teid-dscp-mapping.h	1970-01-01 08:00:00.000000000 +0800
++++ ns-3.22/src/lte/model/teid-dscp-mapping.h	2016-09-22 23:09:33.201596647 +0800
+@@ -0,0 +1,20 @@
++#ifndef TEID_DSCP_MAPPING_H
++#define TEID_DSCP_MAPPING_H
++
++#include <stdint.h>
++#include "ns3/ipv4-header.h"
++#include "ns3/eps-bearer.h"
++
++namespace ns3 {
++
++namespace TeidDscpMapping {
++
++  void SetTeidDscpMapping (uint32_t teid, Ipv4Header::DscpType dscp);
++  void SetTeidDscpMapping (uint32_t teid, EpsBearer::Qci qci);
++  Ipv4Header::DscpType GetTeidDscpMapping (uint32_t teid);
++
++}
++
++}
++
++#endif
+diff -x '*.py' -x '*.pyc' '--exclude=.git' -rupN --new-file ns-3.22-backup/src/lte/wscript ns-3.22/src/lte/wscript
+--- ns-3.22-backup/src/lte/wscript	2015-02-06 07:46:22.000000000 +0800
++++ ns-3.22/src/lte/wscript	2016-10-10 22:48:30.424415016 +0800
+@@ -87,6 +87,7 @@ def build(bld):
+         'model/trace-fading-loss-model.cc',
+         'model/epc-enb-application.cc',
+         'model/epc-sgw-pgw-application.cc',
++        'model/tap-epc-enb-application.cc',
+         'model/epc-x2-sap.cc',
+         'model/epc-x2-header.cc',
+         'model/epc-x2.cc',
+@@ -96,11 +97,13 @@ def build(bld):
+         'model/lte-vendor-specific-parameters.cc',
+         'model/epc-enb-s1-sap.cc',
+         'model/epc-s1ap-sap.cc',
++        'model/epc-s1ap-header.cc',
+         'model/epc-s11-sap.cc',
+         'model/lte-as-sap.cc',
+         'model/epc-ue-nas.cc',
+         'model/lte-harq-phy.cc',
+         'model/epc-mme.cc',
++        'model/tap-epc-mme.cc',
+         'model/lte-asn1-header.cc',
+         'model/lte-rrc-header.cc',
+         'model/lte-handover-management-sap.cc',
+@@ -121,6 +124,8 @@ def build(bld):
+         'model/lte-ffr-enhanced-algorithm.cc',
+         'model/lte-ffr-distributed-algorithm.cc',
+         'model/lte-ue-power-control.cc',
++        'model/lte-time-dilation-factor.cc',
++        'model/teid-dscp-mapping.cc'
+         ]
+ 
+     module_test = bld.create_ns3_module_test_library('lte')
+@@ -261,6 +266,7 @@ def build(bld):
+         'model/trace-fading-loss-model.h',
+         'model/epc-gtpu-header.h',
+         'model/epc-enb-application.h',
++        'model/tap-epc-enb-application.h',
+         'model/epc-sgw-pgw-application.h',
+         'model/lte-vendor-specific-parameters.h',
+         'model/epc-x2-sap.h',
+@@ -271,11 +277,13 @@ def build(bld):
+         'model/lte-mi-error-model.h',
+         'model/epc-enb-s1-sap.h',
+         'model/epc-s1ap-sap.h',
++        'model/epc-s1ap-header.h',
+         'model/epc-s11-sap.h',
+         'model/lte-as-sap.h',
+         'model/epc-ue-nas.h',
+         'model/lte-harq-phy.h',
+         'model/epc-mme.h',
++        'model/tap-epc-mme.h',
+         'model/lte-asn1-header.h',
+         'model/lte-rrc-header.h',
+         'model/lte-handover-management-sap.h',
+@@ -294,13 +302,19 @@ def build(bld):
+         'model/lte-fr-soft-algorithm.h',
+         'model/lte-ffr-soft-algorithm.h',
+         'model/lte-ffr-enhanced-algorithm.h',
+-        'model/lte-ffr-distributed-algorithm.h',     
+-		'model/lte-ue-power-control.h',           
++        'model/lte-ffr-distributed-algorithm.h',
++        'model/lte-ue-power-control.h',
++        'model/lte-time-dilation-factor.h',
++        'model/teid-dscp-mapping.h'
+         ]
+ 
+     if (bld.env['ENABLE_EMU']):
+         module.source.append ('helper/emu-epc-helper.cc')
++        module.source.append ('helper/tap-epc-helper.cc')
++        module.source.append ('helper/epc-helper-header.cc')
+         headers.source.append ('helper/emu-epc-helper.h')
++        headers.source.append ('helper/tap-epc-helper.h')
++        headers.source.append ('helper/epc-helper-header.h')
+ 
+     if (bld.env['ENABLE_EXAMPLES']):
+       bld.recurse('examples')

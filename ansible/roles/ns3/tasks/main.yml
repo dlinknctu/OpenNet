@@ -22,6 +22,7 @@
     - animation-interface.patch
     - netanim-python.patch
     - sta-wifi-scan.patch
+    - lte.patch
   tags: ns3
 - name: Waf configure
   command: "./waf configure"
@@ -34,6 +35,7 @@
   with_items:
     - netanim
     - wifi
+    - lte
   args:
     chdir: "{{ home_location }}/ns-allinone-{{ NS3_VERSION }}/ns-{{ NS3_VERSION }}"
   async: 0
