@@ -11,16 +11,6 @@
     accept_hostkey: true
     version: "opennet"
   tags: mininet
-- name: Add exmaples from OpenNet
-  copy:
-    src: "{{ home_location }}/mininet-patch/examples/"
-    dest: "{{ home_location }}/mininet/examples/"
-  tags: mininet
-- name: Add new module from OpenNet
-  copy:
-    src: "{{ home_location }}/mininet-patch/mininet/"
-    dest: "{{ home_location }}/mininet/mininet"
-  tags: mininet
 - name: Install dlinknctu-mininet
   command: "./util/install.sh -n"
   args:
