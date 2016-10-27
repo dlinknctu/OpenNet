@@ -1,18 +1,18 @@
 OpenNet
 =======
 A simulator built on top of Mininet and ns-3 for Software-Defined Wireless Local Area Network (SDWLAN)  
-http://www.slideshare.net/rascov/20140824-open-net
+http://www.slideshare.net/rascov/20140824-open-net  
 
 Feature
 -------
 * Complement ns-3 by supporting channel scan behavior on Wi-Fi station (sta-wifi-scan.patch)
 * Show CsmaLink and SimpleLink in NetAnim (animation-interface.patch)
-* Fix runtime error when access PacketMetadata of CsmaLink, [Submitted](https://www.nsnam.org/bugzilla/show_bug.cgi?id=1787, "ns-3 bugzilla issue 1787")
+* Fix runtime error when access PacketMetadata of CsmaLink, [Submitted](https://www.nsnam.org/bugzilla/show_bug.cgi?id=1787)
 * Support SDN-based LTE backhaul emulation
 
-Build OpenNet on your own - Use install.sh
-------------------------------------------
-Supports Ubuntu 14.04.5
+Build OpenNet
+-------------
+Support Ubuntu 14.04.5
 
     $ sudo su -
     # apt-get install git ssh
@@ -32,9 +32,8 @@ Run OpenNet example script
 
 Run NetAnim
 -----------
-
-Use NetAnim to open the XML file in the directory /tmp/xml.
-Click "Play Animation" button can start the animation.  
+Use NetAnim to open the XML file in the directory /tmp/xml  
+Click "Play Animation" button can start animation of network activity  
 
     $ sudo su -
     # cd OpenNet
