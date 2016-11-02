@@ -1,10 +1,11 @@
 OpenNet
 =======
-A simulator built on top of Mininet and ns-3 for Software-Defined Wireless Local Area Network (SDWLAN)  
+A simulator for Software-Defined Wireless Local Area Network and Software-Defined LTE Backhaul Netowrk  
 http://www.slideshare.net/rascov/20140824-open-net  
 
 Feature
 -------
+* Built on top of Mininet and ns-3
 * Complement ns-3 by supporting channel scan behavior on Wi-Fi station (sta-wifi-scan.patch)
 * Show CsmaLink and SimpleLink in NetAnim (animation-interface.patch)
 * Fix runtime error when access PacketMetadata of CsmaLink, [Submitted](https://www.nsnam.org/bugzilla/show_bug.cgi?id=1787)
