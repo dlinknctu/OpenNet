@@ -129,3 +129,4 @@ SSH_Daemon_Setup
 Test_Network
 Install_OpenNet
 cat $OPENNET_PATH/opennet_help.txt
+rm $OPENNET_PATH/opennet_help.txt

@@ -17,7 +17,12 @@
   vars_files:
     - group_vars/all
   roles:
+    - pygccxml
+    - gccxml
+    - ns3
+    - netanim
     - dlinknctu-mininet
+    - help
 
 - hosts: opennet-master
   remote_user: root

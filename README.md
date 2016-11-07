@@ -1,6 +1,6 @@
 OpenNet
 =======
-A simulator for Software-Defined Wireless Local Area Network and Software-Defined LTE Backhaul Netowrk  
+An emulator for Software-Defined Wireless Local Area Network and Software-Defined LTE Backhaul Netowrk  
 http://www.slideshare.net/rascov/20140824-open-net  
 
 Feature
