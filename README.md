@@ -11,6 +11,12 @@ Feature
 * Fix runtime error when access PacketMetadata of CsmaLink, [Submitted](https://www.nsnam.org/bugzilla/show_bug.cgi?id=1787)
 * Support SDN-based LTE backhaul emulation (lte.patch)
 
+Reading material
+----------------
+[Mininet Walkthrough](http://mininet.org/walkthrough/)  
+[Introduction to Mininet](https://github.com/mininet/mininet/wiki/Introduction-to-Mininet)  
+[Link modeling using ns-3](https://github.com/mininet/mininet/wiki/Link-modeling-using-ns-3 "Link modeling using ns-3")  
+
 Build OpenNet
 -------------
 Support Ubuntu 14.04.5  
@@ -56,12 +62,6 @@ sudo su -
 cd OpenNet
 python mininet/examples/opennet/lte/lte-example.py
 ```
-
-Reading material
-----------------
-[Mininet Walkthrough](http://mininet.org/walkthrough/)  
-[Introduction to Mininet](https://github.com/mininet/mininet/wiki/Introduction-to-Mininet)  
-[Link modeling using ns-3](https://github.com/mininet/mininet/wiki/Link-modeling-using-ns-3 "Link modeling using ns-3")  
 
 OpenNet Tutorial
 ----------------
