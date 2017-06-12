@@ -49,7 +49,7 @@ python mininet/examples/opennet/wifi/wifi-roaming.py
 
 SDN-based LTE Backhaul Emulation (Advanced Feature)
 ---------------------------------------------------
-Need setup distributed emulation of Mininet, see [here](https://github.com/dlinknctu/OpenNet/blob/master/doc/TUTORIAL.md#distributed-emulation-of-mininet).
+Need setup distributed emulation of Mininet, see [here](https://github.com/dlinknctu/OpenNet/blob/master/doc/TUTORIAL.md#distributed-emulation-of-mininet).  
 
 ```shell
 sudo su -
@@ -59,10 +59,10 @@ python mininet/examples/opennet/lte/lte-example.py
 
 Reading material
 ----------------
-[Mininet Walkthrough](http://mininet.org/walkthrough/)
-[Introduction to Mininet](https://github.com/mininet/mininet/wiki/Introduction-to-Mininet)
-[Link modeling using ns-3](https://github.com/mininet/mininet/wiki/Link-modeling-using-ns-3 "Link modeling using ns-3")
+[Mininet Walkthrough](http://mininet.org/walkthrough/)  
+[Introduction to Mininet](https://github.com/mininet/mininet/wiki/Introduction-to-Mininet)  
+[Link modeling using ns-3](https://github.com/mininet/mininet/wiki/Link-modeling-using-ns-3 "Link modeling using ns-3")  
 
 OpenNet Tutorial
 ----------------
-See [here](https://github.com/dlinknctu/OpenNet/blob/master/doc/TUTORIAL.md).
+See [here](https://github.com/dlinknctu/OpenNet/blob/master/doc/TUTORIAL.md).  
