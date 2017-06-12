@@ -57,11 +57,12 @@ cd OpenNet
 python mininet/examples/opennet/lte/lte-example.py
 ```
 
-Tutorial
---------
+Reading material
+----------------
+[Mininet Walkthrough](http://mininet.org/walkthrough/)
+[Introduction to Mininet](https://github.com/mininet/mininet/wiki/Introduction-to-Mininet)
+[Link modeling using ns-3](https://github.com/mininet/mininet/wiki/Link-modeling-using-ns-3 "Link modeling using ns-3")
+
+OpenNet Tutorial
+----------------
 See [here](https://github.com/dlinknctu/OpenNet/blob/master/doc/TUTORIAL.md).
-
-Reference
----------
-* Link modeling using ns-3, [Link](https://github.com/mininet/mininet/wiki/Link-modeling-using-ns-3 "Link modeling using ns-3")
-
