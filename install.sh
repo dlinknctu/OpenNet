@@ -8,11 +8,14 @@ user=$(whoami)
 
 function Install_Ansible {
 
-    apt-get update
-    apt-get install -y software-properties-common
-    apt-add-repository -y ppa:ansible/ansible
-    apt-get update
-    apt-get install -y ansible
+    apt-get install python-setuptools
+    easy_install pip
+    cd ..
+    git clone https://github.com/ansible/ansible.git
+    cd ansible
+    git checkout v2.3.2.0-1
+    pip install -r ./requirements.txt
+    source ./hacking/env-setup
 
 }
 
